@@ -248,7 +248,6 @@ SUBROUTINE Read_Bladed_FF_Header0 (UnWind, ErrStat)
    INTEGER(B2Ki)              :: Dum_Int2
 
    INTEGER                    :: I
-!rm not used:   INTEGER                    :: TurbType
 
    !-------------------------------------------------------------------------------------------------
    ! Read the header (file has just been opened)
@@ -365,7 +364,6 @@ SUBROUTINE Read_Bladed_FF_Header0 (UnWind, ErrStat)
    
 END SUBROUTINE Read_Bladed_FF_Header0
 !====================================================================================================
-!bjj rm SIunit:SUBROUTINE Read_Bladed_FF (UnWind,ConvFact,StrMFFWS,UBar,TFFSteps,SNYGrids,SNZGrids)
 SUBROUTINE Read_Bladed_FF_Header1 (UnWind, TI, ErrStat)
 !   Reads the binary headers from the turbulence files of the new Bladed variety.
 !   16-May-2002 - Windward Engineering.
@@ -853,13 +851,8 @@ SUBROUTINE Read_Summary_FF ( UnWind, FileName, CWise, ZCenter, TI, ErrStat )
    REAL(ReKi),  INTENT(OUT)   :: TI      (3)    ! turbulence intensities of the wind components as defined in the FF file, not necessarially the actual TI
    INTEGER,     INTENT(OUT)   :: ErrStat        ! returns 0 if no error encountered in the subroutine
    
-!   REAL(ReKi)                 :: ZHub           ! the reference wind point (typically hub-height)
    REAL(ReKi)                 :: ZGOffset       ! The vertical offset of the turbine on rectangular grid (allows turbulence not centered on turbine hub)
-
-!   REAL(ReKi)                 :: GridHeight     ! The grid height, when it is different than the grid width, as found in TurbSim
-!   REAL(ReKi)                 :: GridWidth      ! The grid width
-!   REAL(ReKi)                 :: RDiam
-      
+     
    
    INTEGER, PARAMETER         :: NumStrings = 5 ! number of strings to be looking for in the file
 
@@ -880,8 +873,6 @@ SUBROUTINE Read_Summary_FF ( UnWind, FileName, CWise, ZCenter, TI, ErrStat )
    ErrStat      = 0
    LineCount    = 0
    StrNeeded(:) = .TRUE.
-!   GridHeight   = 0.0        ! Initialize the grid height
-!   GridWidth    = 0.0
    ZGOffset     = 0.0
    RefHt        = 0.0
 
@@ -974,38 +965,6 @@ SUBROUTINE Read_Summary_FF ( UnWind, FileName, CWise, ZCenter, TI, ErrStat )
 !         ! #3: Get the grid width (& height, if available), using the strings "GRID WIDTH" or "RDIAM"
 !         !    If GRID HEIGHT is specified, use it, too. -- THIS IS UNNECESSARY AS IT'S STORED IN THE BINARY FILE
 !         !-------------------------------------------------------------------------------------------         
-!
-!         IF ( INDEX( LINE, 'GRID HEIGHT') > 0 ) THEN    ! TurbSim also uses grid height, before grid width
-!
-!            READ (LINE, *, IOSTAT = Status) GridHeight
-!            IF ( Status /= 0 ) THEN
-!               CALL WrScr( ' Error reading grid height from FF summary file.' )
-!               ErrStat = 3
-!               RETURN
-!            END IF ! Status /= 0
-!
-!         ELSEIF
-!
-!            IF ( INDEX( LINE, 'GRID WIDTH' ) > 0 .OR. INDEX( LINE, 'RDIAM' ) > 0 ) THEN
-!            
-!               READ (LINE, *, IOSTAT = Status) GridWidth
-!            
-!               IF ( Status /= 0 ) THEN
-!                  CALL WrScr( ' Error reading grid width from FF summary file.' )
-!                  ErrStat = 3
-!                  RETURN
-!               END IF ! Status /= 0
-!                     
-!               IF ( GridHeight <= 0.0 )  THEN
-!                  GridHeight = GridWidth
-!               ENDIF
-!               RDiam = MIN( GridHeight, GridWidth )
-!               StrNeeded(3) = .FALSE.
-!               
-!            END IF !INDEX for "GRID WIDTH" or "RDIAM"
-!            
-!         END IF
-!
 
       ELSEIF ( StrNeeded(4) ) THEN
       
@@ -1723,204 +1682,6 @@ FUNCTION FF_GetWindSpeed(Time, InputPosition, ErrStat)
 
 END FUNCTION FF_GetWindSpeed
 !====================================================================================================
-!FUNCTION FF_Interp(Time, Position, ErrStat)
-!!    This function is used to interpolate into the full-field wind array.  It receives X, Y, Z and
-!!    TIME from the calling routine.  It then computes a time shift due to a nonzero X based upon 
-!!    the average windspeed.  The modified time is used to decide which pair of time slices to interpolate
-!!    within and between.  After finding the two time slices, it decides which four grid points bound the 
-!!    (Y,Z) pair.  It does a bilinear interpolation for each time slice. Linear interpolation is then used 
-!!    to interpolate between time slices.  This routine assumes that X is downwind, Y is to the left when  
-!!    looking downwind and Z is up.  It also assumes that no extrapolation will be needed.
-!!
-!!    11/07/94 - Created by M. Buhl from the original TURBINT.
-!!    09/25/97 - Modified by M. Buhl to use f90 constructs and new variable names.  Renamed to FF_Interp.
-!!    09/23/09 - Modified by B. Jonkman to use arguments instead of modules to determine time and position.  
-!!               Height is now relative to the ground
-!!----------------------------------------------------------------------------------------------------
-!
-!   IMPLICIT                      NONE
-!
-!   REAL(ReKi),      INTENT(IN) :: Position(3)       ! takes the place of XGrnd, YGrnd, ZGrnd
-!   REAL(ReKi),      INTENT(IN) :: Time
-!   REAL(ReKi)                  :: FF_Interp(3)      ! Takes the place of FFWind
-!
-!   INTEGER,         INTENT(OUT):: ErrStat
-!
-!      ! Local Variables:
-!
-!   REAL(ReKi)                  :: SLOPE
-!   REAL(ReKi)                  :: TimeShifted
-!   REAL(ReKi),PARAMETER        :: Tol = 1.0E-3      ! a tolerance for determining if two reals are the same (for extrapolation)
-!   REAL(ReKi)                  :: W_YH_Z
-!   REAL(ReKi)                  :: W_YH_ZH
-!   REAL(ReKi)                  :: W_YH_ZL
-!   REAL(ReKi)                  :: W_YL_Z
-!   REAL(ReKi)                  :: W_YL_ZH
-!   REAL(ReKi)                  :: W_YL_ZL
-!   REAL(ReKi)                  :: Wnd      (2)
-!   REAL(ReKi)                  :: T
-!   REAL(ReKi)                  :: TGRID
-!   REAL(ReKi)                  :: Y
-!   REAL(ReKi)                  :: YGRID
-!   REAL(ReKi)                  :: Z
-!   REAL(ReKi)                  :: ZGRID
-!
-!   INTEGER                    :: IDIM
-!   INTEGER                    :: IG
-!   INTEGER                    :: IT
-!   INTEGER                    :: ITHI
-!   INTEGER                    :: ITLO
-!   INTEGER                    :: IYHI
-!   INTEGER                    :: IYLO
-!   INTEGER                    :: IZHI
-!   INTEGER                    :: IZLO
-!
-!   !-------------------------------------------------------------------------------------------------
-!   ! Initialize variables
-!   !-------------------------------------------------------------------------------------------------
-!
-!   FF_Interp(:)          = 0.0                         ! the output velocities (in case NFFComp /= 3)
-!   Wnd(:)                = 0.0                         ! just in case we're on an end point
-!
-!   !-------------------------------------------------------------------------------------------------
-!   ! Find the bounding time slices.
-!   !-------------------------------------------------------------------------------------------------
-!
-!   ! Perform the time shift.  At time=0, a point half the grid width downstream (FFYHWid) will index into the zero time slice.  
-!   ! If we did not do this, any point downstream of the tower at the beginning of the run would index outside of the array.   
-!   ! This all assumes the grid width is at least as large as the rotor.  If it isn't, then the interpolation will not work.
-!
-!! bjj: should we shift by MIN(FFYHWid,FFZHWid) instead of FFYHWid?
-!
-!   TimeShifted = TIME + ( FFYHWid - Position(1) )*InvMFFWS    ! in distance, X: (TIME*MeanFFWS + FFYHWid) - InputInfo%Position(1))
-!   TGRID       = TimeShifted*FFRate
-!
-!   ITLO = INT( TGRID ) + 1             ! convert REAL to INTEGER, then add one since our grids start at 1, not 0
-!   ITHI = ITLO + 1
-!   
-!   T    = TGRID - ( ITLO - 1 )         ! a value between 0 and 1 that indicates a relative location between ITLO and ITHI
-!
-!   IF ( ITLO >= NFFSteps .OR. ITLO < 1 ) THEN
-!!      IF ( ITLO == NFFSteps .AND. T <= TOL ) THEN
-!      IF ( ITLO == NFFSteps  ) THEN
-!         ITHI = ITLO   
-!         IF ( T <= TOL ) THEN ! we're on the last point
-!            T = 0.0
-!         ELSE  ! We'll extrapolate one dt past the last value in the file
-!            ITLO = ITHI - 1
-!         END IF         
-!      ELSE                 
-!         CALL WrScr( ' Error FF wind array was exhausted at '//TRIM( Flt2LStr( REAL( TIME,   ReKi ) ) )// & 
-!                        ' seconds (trying to access data at '//TRIM( Flt2LStr( REAL( TimeShifted, ReKi ) ) )//' seconds).'  )
-!         ErrStat = 1   
-!         RETURN
-!      END IF
-!   ENDIF
-!
-!
-!   !-------------------------------------------------------------------------------------------------
-!   ! Find the bounding columns for the Y position. [The lower-left corner is (1,1) when looking upwind.]
-!   !-------------------------------------------------------------------------------------------------
-!
-!   YGRID = ( Position(2) + FFYHWid )*InvFFYD    ! really, it's (Position(2) - -1.0*FFYHWid)
-!
-!   IYLO = INT( YGRID ) + 1             ! convert REAL to INTEGER, then add one since our grids start at 1, not 0
-!   IYHI = IYLO + 1
-!
-!   Y    = YGRID - ( IYLO - 1 )         ! a value between 0 and 1 that indicates a relative location between IYLO and IYHI
-!   
-!   IF ( IYLO >= NYGrids .OR. IYLO < 1 ) THEN
-!      IF ( IYLO == 0 .AND. Y >= 1.0-TOL ) THEN
-!         Y    = 0.0 
-!         IYLO = 1
-!      ELSE IF ( IYLO == NYGrids .AND. Y <= TOL ) THEN
-!         Y    = 0.0
-!         IYHI = IYLO                   ! We're right on the last point, which is still okay      
-!      ELSE
-!         CALL WrScr( ' Error FF wind array boundaries violated: Grid too small in Y direction.' )
-!         ErrStat = 2   
-!         RETURN
-!      END IF
-!   ENDIF
-!
-!
-!   !-------------------------------------------------------------------------------------------------
-!   ! Find the bounding rows for the Z position. [The lower-left corner is (1,1) when looking upwind.]
-!   !-------------------------------------------------------------------------------------------------
-!
-!   ZGRID = ( Position(3) - GridBase )*InvFFZD  !
-!
-!   IZLO = INT( ZGRID ) + 1             ! convert REAL to INTEGER, then add one since our grids start at 1, not 0
-!   IZHI = IZLO + 1
-!
-!   Z = ZGRID - ( IZLO - 1 )            ! a value between 0 and 1 that indicates a relative location between IZLO and IZHI
-!
-!   IF ( IZLO < 1 ) THEN
-!      IF ( IZLO == 0 .AND. Z >= 1.0-TOL ) THEN
-!         Z    = 0.0 
-!         IZLO = 1
-!      ELSE
-!         CALL WrScr( ' Error FF wind array boundaries violated: Grid too small in Z direction (height is below the grid).' )
-!         ErrStat = 1   
-!         RETURN
-!      END IF
-!   ELSEIF ( IZLO >= NZGrids ) THEN
-!      IF ( IZLO == NZGrids .AND. Z <= TOL ) THEN
-!         Z    = 0.0
-!         IZHI = IZLO                   ! We're right on the last point, which is still okay
-!      ELSE      
-!         CALL WrScr( ' Error FF wind array boundaries violated: Grid too small in Z direction (height is above the grid).' )
-!         ErrStat = 3   
-!         RETURN
-!      END IF         
-!   ENDIF
-!
-!
-!   !-------------------------------------------------------------------------------------------------
-!   ! Loop through all the wind components.
-!   !-------------------------------------------------------------------------------------------------
-!
-!   DO IDIM=1,NFFComp
-!
-!      IG = 1
-!
-!      DO IT=ITLO,ITHI
-!
-!         !-------------------------------------------------------------------------------------------
-!         ! Get the wind velocity values for the four corners of the grid for this time.
-!         !-------------------------------------------------------------------------------------------
-!
-!         W_YL_ZL = FFData( IZLO, IYLO, IDIM, IT )
-!         W_YL_ZH = FFData( IZHI, IYLO, IDIM, IT )
-!         W_YH_ZL = FFData( IZLO, IYHI, IDIM, IT )
-!         W_YH_ZH = FFData( IZHI, IYHI, IDIM, IT )
-!
-!
-!         !-------------------------------------------------------------------------------------------
-!         ! Interpolate within the grid for this time.
-!         !-------------------------------------------------------------------------------------------
-!
-!         W_YL_Z  = ( W_YL_ZH - W_YL_ZL )*Z + W_YL_ZL
-!         W_YH_Z  = ( W_YH_ZH - W_YH_ZL )*Z + W_YH_ZL
-!         Wnd(IG) = ( W_YH_Z  - W_YL_Z  )*Y + W_YL_Z
-!
-!         IG = IG + 1
-!
-!      END DO !IT
-!
-!      !----------------------------------------------------------------------------------------------
-!      ! Interpolate between the two times.
-!      !----------------------------------------------------------------------------------------------
-!      
-!      FF_Interp(IDIM) = ( Wnd(2) - Wnd(1) ) * T + Wnd(1)    ! interpolated velocity
-!      
-!   END DO !IDIM
-!
-!
-!   RETURN
-!   
-!END FUNCTION FF_Interp
-!====================================================================================================
 FUNCTION FF_Interp(Time, Position, ErrStat)
 !    This function is used to interpolate into the full-field wind array or tower array if it has   
 !    been defined and is and necessary for the given inputs.  It receives X, Y, Z and
@@ -1951,7 +1712,6 @@ FUNCTION FF_Interp(Time, Position, ErrStat)
 
       ! Local Variables:
 
-!rm not used:   REAL(ReKi)                  :: SLOPE
    REAL(ReKi)                  :: TimeShifted
    REAL(ReKi),PARAMETER        :: Tol = 1.0E-3      ! a tolerance for determining if two reals are the same (for extrapolation)
    REAL(ReKi)                  :: W_YH_Z
@@ -1995,7 +1755,7 @@ FUNCTION FF_Interp(Time, Position, ErrStat)
    ! If we did not do this, any point downstream of the tower at the beginning of the run would index outside of the array.   
    ! This all assumes the grid width is at least as large as the rotor.  If it isn't, then the interpolation will not work.
 
-! bjj: should we shift by MIN(FFYHWid,FFZHWid) instead of FFYHWid?  Keep this the same as FF_Interp!
+! bjj: should we shift by MIN(FFYHWid,FFZHWid) instead of FFYHWid?
 
    TimeShifted = TIME + ( FFYHWid - Position(1) )*InvMFFWS    ! in distance, X: (TIME*MeanFFWS + FFYHWid) - InputInfo%Position(1))
    TGRID       = TimeShifted*FFRate

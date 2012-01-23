@@ -9,7 +9,8 @@ MODULE AeroDyn
 !  Originally created by
 !  Windward Engineering, LC
 !  ..................................................................................................
-!  v13.00.00    31 Mar 2010         B. Jonkman           NREL/NWTC
+!  v13.00.00a-bjj    31 Mar 2010         B. Jonkman           NREL/NWTC
+!  v13.00.00         20 Jan 2012         B. Jonkman           NREL/NWTC
 !----------------------------------------------------------------------------------------------------
    USE                        NWTC_Library
    USE                        SharedTypes
@@ -29,7 +30,7 @@ MODULE AeroDyn
    !-------------------------------------------------------------------------------------------------
    ! Public data
    !-------------------------------------------------------------------------------------------------
-   TYPE(ProgDesc), PARAMETER, PUBLIC :: AD_Prog = ProgDesc( 'AeroDyn', '(v13.00.00a-bjj, 31-Mar-2010)' )   ! the name/version/date of the Aerodynamics program
+   TYPE(ProgDesc), PARAMETER, PUBLIC :: AD_Prog = ProgDesc( 'AeroDyn', '(v13.00.00, 20-Jan-2012)' )   ! the name/version/date of the Aerodynamics program
 
 
    !-------------------------------------------------------------------------------------------------
@@ -42,12 +43,6 @@ MODULE AeroDyn
    PUBLIC :: AD_GetConstant
    PUBLIC :: AD_Terminate
 
-!   TYPE, PUBLIC :: TurbineConfig_Old
-!      INTEGER                    :: NumBlades
-!      REAL(ReKi)                 :: TipRadius               ! in meters
-!      REAL(ReKi)                 :: HubRadius
-!      REAL(ReKi)                 :: PreconeAngle            ! in radians
-!   END TYPE TurbineConfig_Old
 
    TYPE, PUBLIC :: AD_InitOptions
       CHARACTER(1024)            :: ADInputFile             ! Name of the AeroDyn input file
@@ -57,15 +52,7 @@ MODULE AeroDyn
 
 
 
-!temporary types to work on loops...
    TYPE, PUBLIC :: AeroLoadsOptions
-!      REAL(ReKi)                 :: RotorSpeed           ! REVS from GetRotorParams()  rotor speed [rad/sec]
-!      REAL(ReKi)                 :: YawAngle             ! YawAng from GetRotorParams() - nacelle yaw angle (+ clockwise from above) [rad]
-!      REAL(ReKi)                 :: HubVDue2Yaw          ! YAWVEL from GetRotorParams() - hub velocity due solely to yaw rate (yaw rate * rotor sling) [m/sec]; positive yaw rate (+ cw from above) leads to positive YawVel
-!      REAL(ReKi)                 :: TiltAngle            ! TILT from GetRotorParams()   - tilt angle of the rotor shaft to the horizontal plane [rad]; (+ tilt lowers the upwind end of the nacelle)
-!      REAL(ReKi),ALLOCATABLE     :: AzimuthAngle(:)      ! Psi from GetBladeParams(); azimuth angle measured from 0 down, positive clockwise looking downwind[rad]
-!      REAL(ReKi),ALLOCATABLE     :: ElementPitch(:,:)    ! PITNOW from GetElemParams() includes aerodynamic twist w/ blade pitch
-!      REAL(ReKi),ALLOCATABLE     :: RLocal(:,:)          ! RLocal from GetElemParams()
       LOGICAL   ,ALLOCATABLE     :: SetMulTabLoc(:,:)
       REAL(ReKi),ALLOCATABLE     :: MulTabLoc(:,:)                      ! MulTabLoc from GetElemParams()
       LOGICAL                    :: LinearizeFlag
@@ -103,7 +90,6 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
       ! Passed variables
 
    TYPE(AD_InitOptions),INTENT(IN)  :: ADOptions               ! Options for AeroDyn
-!   TYPE(TurbineConfig_Old), INTENT(IN)  :: TurbineParams           ! Turbine parameters, necessary for initialization
    TYPE(AeroConfig),    INTENT(IN)  :: TurbineComponents       ! initial configuration of the turbine components
    INTEGER,             INTENT(OUT) :: ErrStat                 ! Determines if an error was encountered
 
@@ -143,16 +129,6 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
    !-------------------------------------------------------------------------------------------------
    ! Set the program description variables stored in MODULE Identify
    !-------------------------------------------------------------------------------------------------
-!   AeroProg    = AD_Prog%Name
-!   AeroVer     = AD_Prog%Ver
-
-!   DynProg     = CallingProg%Name
-!   DynVer      = CallingProg%Ver
-
-
-!   WRITE(Prog,'(A)') TRIM(AeroProg)//' '//TRIM(AeroVer)//' in '//TRIM(DynProg)//' '//TRIM(DynVer)
-!   WRITE(Prog,'(A)') TRIM(AeroProg)//' '//TRIM(AeroVer)
-
    CALL WrScr1 ( ' Aerodynamic loads calculated using '//TRIM(AD_Prog%Name)//' '//TRIM(AD_Prog%Ver)//'.' )
 
    !-------------------------------------------------------------------------------------------------
@@ -160,7 +136,6 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
    !-------------------------------------------------------------------------------------------------
    NB = SIZE( TurbineComponents%Blade )
    
-!   NB          = TurbineParams%NumBlades
    WrOptFile   = ADOptions%WrSumFile
 
    IF ( NB < 1 ) THEN
@@ -215,21 +190,19 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
    !-------------------------------------------------------------------------------------------------
    HubRadius = DOT_PRODUCT( TurbineComponents%Blade(1)%Position(:) - TurbineComponents%Hub%Position(:), &
                             TurbineComponents%Blade(1)%Orientation(3,:) )
-!   HubRadius = SQRT( SUM( (TurbineComponents%Blade(1)%Position(:) - TurbineComponents%Hub%Position(:))**2 ) )
                             
                             
       
    DO IB = 2,NB
       TmpVar = DOT_PRODUCT( TurbineComponents%Blade(IB)%Position(:) - TurbineComponents%Hub%Position(:), &
                             TurbineComponents%Blade(IB)%Orientation(3,:) )
-!      TmpVar = SQRT( SUM( (TurbineComponents%Blade(IB)%Position(:) - TurbineComponents%Hub%Position(:))**2 ) )
 
       IF ( ABS( TmpVar - HubRadius ) > 0.001 ) THEN ! within 1 mm
          CALL ProgWarn( ' AeroDyn\AD_Init() calculated HubRadius is not the same for all '// &
                            'blades. Using value from blade 1.' )
          EXIT                           
       END IF
-   END DO !IBld
+   END DO !IB
    
    TipRadius = TurbineComponents%BladeLength + HubRadius
    
@@ -248,23 +221,7 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
    
    CosPrecone = COS( CosPrecone )
      
-!print *, HubRadius, TipRadius, ACOS(CosPrecone)   
-     
-!   CosPrecone = COS(TurbineParams%PreconeAngle)
-!
-!   IF ( TurbineParams%TipRadius < 0 ) THEN
-!      TipRadius = RELM(NELM) + 0.5 * DR(NELM)         !estimate it
-!   ELSE
-!      TipRadius = TurbineParams%TipRadius
-!   END IF
-   R = TipRadius * CosPrecone
-
-
-!   IF ( TurbineParams%HubRadius < 0 ) THEN
-!      HubRadius = ( RELM(1) - 0.5 * DR(1) )           !estimate it
-!   ELSE
-!      HubRadius = TurbineParams%HubRadius
-!   END IF
+   R    = TipRadius * CosPrecone
    RHub = HubRadius * CosPrecone
 
       ! Check that the AeroDyn input DR and RElm match (use the HubRadius and TipRadius to verify)
@@ -360,9 +317,6 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
    !-------------------------------------------------------------------------------------------------
 
    IF (DynInfl) THEN
-
-!      MeanWind = WindInf_GetMean( REAL(0.0, ReKi), REAL(600.0, ReKi), dtAero, &  !BJJ: the end time should not be hard coded, but I don't have a very good way of determining it now...
-!                                  REAL( (/0.0, 0.0, HH/), ReKi ),  ErrStat )
 
       MeanWind = WindInf_ADhack_DIcheck( ErrStat )
 
@@ -477,7 +431,6 @@ FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, Curren
 !----------------------------------------------------------------------------------------------------
 
    USE                           AeroTime !,   ONLY: Time, OldTime, DT, DTAero
-   !USE                           AeroGenSubs,ONLY: Cross_Product
    USE                           Airfoil,    ONLY: MulTabLoc
    USE                           AeroSubs
    USE                           Blade,      ONLY: R, NB, DR
@@ -494,17 +447,17 @@ FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, Curren
    TYPE( AllAeroMarkers ), INTENT(IN)  :: InputMarkers            ! The input state of all aerodynamic markers
    TYPE( AeroLoadsOptions),INTENT(IN)  :: CurrentADOptions
    TYPE( AeroConfig ),     INTENT(IN)  :: TurbineComponents       ! The markers defining the current location of the turbine
-  
-   TYPE( AllAeroLoads )                :: AD_CalculateLoads       ! the aerodynamic loads calculated at the input marker locations
-   
-   REAL(ReKi), PARAMETER               :: OnePlusEpsilon = 1 + EPSILON(CurrentTime)
    INTEGER,                INTENT(OUT) :: ErrStat                 ! Determines if an error was encountered
-
+  
       ! Function definition
 
-!   TYPE( AllAeroLoads  )               :: AD_CalculateLoads
+   TYPE( AllAeroLoads )                :: AD_CalculateLoads       ! the aerodynamic loads calculated at the input marker locations
+   
+
+
 
       ! Local variables
+   REAL(ReKi), PARAMETER      :: OnePlusEpsilon = 1 + EPSILON(CurrentTime)
 
    REAL(ReKi)                 :: VNElement
    REAL(ReKi)                 :: VelNormalToRotor2
@@ -616,15 +569,10 @@ FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, Curren
            - ( AvgVelNacelleRotorFurlYaw * rRotorFurlHub(1) + AvgVelTowerBaseNacelleYaw * rNacelleHub(1) &
                     + AvgVelTowerBaseYaw * rTowerBaseHub(1) ) * CYaw
                                
-!print *, 'YawAng=', YawAng, CurrentTurbineState%YawAngle
-!print *, 'REVS=', REVS, CurrentTurbineState%RotorSpeed
-!print *, 'Tilt=', Tilt, CurrentTurbineState%TiltAngle
-!print *, 'YAWVEL=', YAWVEL, CurrentTurbineState%HubVDue2Yaw
    
    !.................................................................................................
    ! start of NewTime routine
    !.................................................................................................
-   !CALL GetRotorParams (REVS, YawAng, YAWVEL, TILT)
 
    AvgInfl = SumInfl * 2.0 / (R*R*NB)        ! Compute average inflow from the previous time step
    SumInfl = 0.0                             ! reset to sum for the current time step
@@ -653,8 +601,6 @@ FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, Curren
                                              TurbineComponents%RotorFurl%Orientation(3,:) )  ) + pi + (IBlade - 1)*TwoPiNB
       
       
-!print *, 'Azimuth=', AzimuthAngle, CurrentTurbineState%AzimuthAngle(         IBlade)                                            
-
    
       DO IElement = 1,NElm
             
@@ -676,11 +622,6 @@ FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, Curren
                         + DOT_PRODUCT( tmpVector, TurbineComponents%Hub%Orientation(3,:) )**2  )
 
 
-
-
-!print *, 'IBlade, IElement= ', IBlade, IElement
-!print *, 'PitNow= ', PitNow,       CurrentTurbineState%ElementPitch(IElement,IBlade)                                            
-!print *, 'rLocal= ', rLocal,       CurrentTurbineState%rLocal(      IElement,IBlade)                                            
                       
             ! determine if MulTabLoc should be set.  
             ! bjj: I have no idea how this is really (supposed to be) used!!! .... 
@@ -707,15 +648,6 @@ FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, Curren
          tmpVector =     CPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(1,:) + SPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(2,:)
          VNWind    =     DOT_PRODUCT( tmpVector, VelocityVec )
          VNElement = -1.*DOT_PRODUCT( tmpVector, InputMarkers%Blade(IElement,IBlade)%TranslationVel )  ! = DOT_PRODUCT( CurrentInputs%TransVel, -1.*Orientation )
-
-
-
-! using old orientation:
-!         VTTotal   =     DOT_PRODUCT( InputMarkers%Blade(IElement,IBlade)%Orientation(2,:),            &
-!                                      VelocityVec - InputMarkers%Blade(IElement,IBlade)%TranslationVel  )
-!         VNWind    =     DOT_PRODUCT( InputMarkers%Blade(IElement,IBlade)%Orientation(1,:), VelocityVec )
-!         VNElement = -1.*DOT_PRODUCT( InputMarkers%Blade(IElement,IBlade)%Orientation(1,:),            &
-!                                      InputMarkers%Blade(IElement,IBlade)%TranslationVel                )  ! = DOT_PRODUCT( CurrentInputs%TransVel, -1.*CurrentInputs%DCM(1,:) )
 
 
          !-------------------------------------------------------------------------------------------

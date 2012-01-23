@@ -333,8 +333,6 @@ FUNCTION CT_GetWindSpeed(Time, InputPosition, ErrStat)
    INTEGER                       :: IZHi(3)
    INTEGER                       :: IZLo(3)
 
-!rm   CHARACTER( 5)                 :: CTNum                                  ! String containing the current file number.
-
 
    !-------------------------------------------------------------------------------------------------     
    ! Check that we've initialized everything first
@@ -442,7 +440,6 @@ FUNCTION CT_GetWindSpeed(Time, InputPosition, ErrStat)
 
    END IF
          
-!write(12,* ) IndCT_lo, INdCT_hi, CTvel_files(:)          
 
    !-------------------------------------------------------------------------------------------------
    ! Calculate the y values;                   The lower-right corner is (1,1) when looking downwind.
@@ -588,14 +585,6 @@ SUBROUTINE ReadCTData ( UnWind, CTFileNo, Itime, ErrStat )
    INTEGER,       INTENT(OUT)    :: ErrStat                                   ! returns 0 if no error; non-zero otherwise
 
       ! Local variables.
-
-!rm not used:   INTEGER                       :: Icomp                                     ! The index of the wind components, u, v, and w
-!rm not used:   INTEGER                       :: IY                                        ! A DO index for indexing the arrays in the y direction.
-!rm not used:   INTEGER                       :: IYK                                       ! An index for the decimated arrays in the y direction.
-!rm not used:   INTEGER                       :: IZ                                        ! A DO index for indexing the arrays in the z direction.
-!rm not used:   INTEGER                       :: IZK                                       ! An index for the decimated arrays in the z direction.
-
-!rm not used:   INTEGER(B2Ki)                 :: Com    (NumCTy)                           ! Temporary array to hold component's integer values for a given Z.
 
 !   CHARACTER(1),PARAMETER        :: Comp(NumComps) = (/'u', 'v', 'w' /)       ! the wind components
    CHARACTER(5)                  :: CTnum                                     ! string equivalent of input variable CTFileNo

@@ -12,12 +12,8 @@ MODULE FDWind
     USE                     SharedInflowDefns
 
     IMPLICIT                NONE
-
-      ! FD_Wind
-   !bjj:       Inv4DdT, Inv4DdX, Inv4DdY, Inv4DdZ, Zbot are computed, but never used elsewhere
-   !bjj:       Zm_maxo is no longer necessary
-      
-   
+     
+        
    REAL(ReKi)                   :: DelXgrid                                   ! The nondimensional distance between grid points in the x direction.
    REAL(ReKi)                   :: DelYgrid                                   ! The nondimensional distance between grid points in the y direction.
    REAL(ReKi)                   :: DelZgrid                                   ! The nondimensional distance between grid points in the z direction.
@@ -46,7 +42,6 @@ MODULE FDWind
    REAL(ReKi)                   :: Xt                                         ! Distance of the tower from the upwind end of the dataset.
    REAL(ReKi)                   :: Ymax                                       ! The dimensional lateral width of the dataset.
    REAL(ReKi)                   :: Yt                                         ! Distance of the tower from the right side of the dataset (looking downwind).
-!   REAL(ReKi)                   :: Zbot                                       ! Height of the bottom of the wave.
    REAL(ReKi)                   :: Zmax                                       ! The dimensional vertical height of the dataset.
    REAL(ReKi)                   :: Zt                                         ! Distance of the hub from the bottom of the dataset.
    REAL(ReKi)                   :: Zref                                       ! The reference height (hub height)
@@ -916,7 +911,6 @@ FUNCTION FD_GetWindSpeed(Time, InputPosition, ErrStat)
 ! extrapolation will be needed except in time and the Z direction.  In those cases, the appropriate
 ! steady winds are used.
 !----------------------------------------------------------------------------------------------------
-!   Zbot        = HH - Zt                                                  ! Height of the bottom of the wave.
 
       ! Passed variables:
       
@@ -946,22 +940,13 @@ FUNCTION FD_GetWindSpeed(Time, InputPosition, ErrStat)
 
    INTEGER                    :: IT                                        ! Index for do loop
    INTEGER                    :: IXHI                                      ! Index for the more-positive x value.
-!rm not used:   INTEGER                    :: IXK                                       ! An index for the decimated arrays in the x direction.
    INTEGER                    :: IXLO                                      ! Index for the more-negative x value.
    INTEGER                    :: IYHI                                      ! Index for the more-positive y value.
-!rm not used:   INTEGER                    :: IYK                                       ! An index for the decimated arrays in the y direction.
    INTEGER                    :: IYLO                                      ! Index for the more-negative y value.
    INTEGER                    :: IZHI                                      ! Index for the more-positive z value.
    INTEGER                    :: IZHI_w                                    ! Index for the more-positive z value for the w component.
-!rm not used:   INTEGER                    :: IZK                                       ! An index for the decimated arrays in the z direction.
    INTEGER                    :: IZLO                                      ! Index for the more-negative z value.
    INTEGER                    :: IZLO_w                                    ! Index for the more-negative z value for the w component.
-
-!rm not used:   CHARACTER( 5)              :: FDNum                                     ! String containing the current file number.
-!rm not used:   CHARACTER(50)              :: Frmt                                      ! Format string used for error messages.
-!rm not used:   CHARACTER(80)              :: MESAGE                                    ! String containing an error message.
-!rm not used:   CHARACTER(15)              :: TmpFileNum                                ! String containing part of the current file name.
-
 
    !-------------------------------------------------------------------------------------------------     
    ! Check that we've initialized everything first

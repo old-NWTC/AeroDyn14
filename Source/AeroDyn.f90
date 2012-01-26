@@ -13,7 +13,7 @@ MODULE AeroDyn
 !  v13.00.00         20 Jan 2012         B. Jonkman           NREL/NWTC
 !----------------------------------------------------------------------------------------------------
    USE                        NWTC_Library
-   USE                        SharedTypes
+   USE                        SharedTypes !bjj: replace with MODULE SharedDataTypes, which will be in the NWTC Library (to share definitions with HydroDyn)
 
    USE                        InflowWind
    USE                        SharedInflowDefns
@@ -22,7 +22,7 @@ MODULE AeroDyn
    IMPLICIT NONE
    PUBLIC  !BJJ: note that this is a little different than the typical "PRIVATE" unless explicitly
            !stated.  The reason is that now we can just say "USE AeroDyn" and include all the public
-           !components of InflowWind, ShareTypes, SharedInflowDefs, etc instead of having to
+           !components of InflowWind, SharedTypes, SharedInflowDefs, etc instead of having to
            !explicitly include those modules, too.  However, care must be taken to explicitly state
            !which variables should be PRIVATE!
 
@@ -30,7 +30,7 @@ MODULE AeroDyn
    !-------------------------------------------------------------------------------------------------
    ! Public data
    !-------------------------------------------------------------------------------------------------
-   TYPE(ProgDesc), PARAMETER, PUBLIC :: AD_Prog = ProgDesc( 'AeroDyn', '(v13.00.00, 20-Jan-2012)' )   ! the name/version/date of the Aerodynamics program
+   TYPE(ProgDesc), PARAMETER, PUBLIC :: AD_Prog = ProgDesc( 'AeroDyn', '(v13.00.01a-bjj, 30-Jan-2012)' )   ! the name/version/date of the Aerodynamics program
 
 
    !-------------------------------------------------------------------------------------------------
@@ -61,8 +61,13 @@ MODULE AeroDyn
    !-------------------------------------------------------------------------------------------------
    ! Internal variables and types
    !-------------------------------------------------------------------------------------------------
-   LOGICAL, PRIVATE, SAVE            :: Initialized       = .FALSE.
-   LOGICAL, PRIVATE, SAVE            :: NoLoadsCalculated = .TRUE.
+   LOGICAL, PRIVATE, SAVE            :: Initialized        = .FALSE.
+   LOGICAL, PRIVATE, SAVE            :: NoLoadsCalculated  = .TRUE.
+   
+!BJJ start of plotting info
+   LOGICAL, PRIVATE, PARAMETER       :: OutputPlottingInfo = .false. !BJJ SET THIS = .FALSE. !!!!
+   INTEGER, PRIVATE, PARAMETER       :: UNADPlt            = 70
+!BJJ end of plotting info
 
    REAL(ReKi), PRIVATE               :: TwoPiNB                         ! 2*pi/number of blades
    TYPE(AllAeroLoads), PRIVATE       :: ADCurrentLoads                  ! copy of current loads to return
@@ -127,7 +132,7 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
 
 
    !-------------------------------------------------------------------------------------------------
-   ! Set the program description variables stored in MODULE Identify
+   ! Write the program name and version to the screen
    !-------------------------------------------------------------------------------------------------
    CALL WrScr1 ( ' Aerodynamic loads calculated using '//TRIM(AD_Prog%Name)//' '//TRIM(AD_Prog%Ver)//'.' )
 
@@ -221,7 +226,7 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
    
    CosPrecone = COS( CosPrecone )
      
-   R    = TipRadius * CosPrecone
+   R = TipRadius * CosPrecone
    RHub = HubRadius * CosPrecone
 
       ! Check that the AeroDyn input DR and RElm match (use the HubRadius and TipRadius to verify)
@@ -407,6 +412,41 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
 !   END IF
 
 
+!bjj start of plotting info:
+   IF ( OutputPlottingInfo ) THEN
+   
+      CALL OpenFOutFile( UNADPlt, TRIM(ADOptions%OutRootName)//'_plotInfo.txt' )
+      WRITE( UNADPlt, '(A,1X,F20.5)' ) 'HubRadius',   HubRadius
+      WRITE( UNADPlt, '(A,1X,F20.5)' ) 'TipRadius',   TipRadius
+      WRITE( UNADPlt, '(A,1X,F20.5)' ) 'BladeLength', TurbineComponents%BladeLength
+      WRITE( UNADPlt, '(A,1X,I2)'    ) 'NumBlades',   NB
+      WRITE( UNADPlt, '(A,1X,I2)'    ) 'NumElements', NElm
+      
+      WRITE( UNADPlt, '("AeroConfig:")' )
+      DO IB=1,NB
+         WRITE( UNADPlt, '(A,I1,A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+             'Blade',IB,'_Position      ', TurbineComponents%Blade(IB)%Position(:), TurbineComponents%Blade(IB)%Orientation(:,:)
+      END DO
+      
+      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'Hub_Position         ', TurbineComponents%Hub%Position(:),TurbineComponents%Hub%Orientation(:,:)
+      
+      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'RotorFurl_Position   ', TurbineComponents%RotorFurl%Position(:),TurbineComponents%RotorFurl%Orientation(:,:)
+
+      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'Nacelle_Position     ', TurbineComponents%Nacelle%Position(:),TurbineComponents%Nacelle%Orientation(:,:)
+
+      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'TailFin_Position     ', TurbineComponents%TailFin%Position(:), TurbineComponents%TailFin%Orientation(:,:)
+
+      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'Tower_Position       ', TurbineComponents%Tower%Position(:),TurbineComponents%Tower%Orientation(:,:)
+
+
+   END IF      
+!bjj end of plotting info:
+
    !-------------------------------------------------------------------------------------------------
    ! Initialize AeroDyn variables not initialized elsewhere (except in module initialization)
    ! and return
@@ -521,6 +561,47 @@ FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, Curren
 
    ENDIF
 
+
+!BJJ start of plotting info
+   IF ( OutputPlottingInfo ) THEN
+   
+      WRITE( UNADPlt, '("AeroConfig: Time =",F20.5)' ) CurrentTime
+      DO IBlade=1,NB
+         WRITE( UNADPlt, '(A,I1,A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+             'Blade',IBlade,'_Position      ', TurbineComponents%Blade(IBlade)%Position(:), &
+                                               TurbineComponents%Blade(IBlade)%Orientation(:,:)
+      END DO
+      
+      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'Hub_Position         ', TurbineComponents%Hub%Position(:),TurbineComponents%Hub%Orientation(:,:)
+      
+      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'RotorFurl_Position   ', TurbineComponents%RotorFurl%Position(:),TurbineComponents%RotorFurl%Orientation(:,:)
+
+      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'Nacelle_Position     ', TurbineComponents%Nacelle%Position(:),TurbineComponents%Nacelle%Orientation(:,:)
+
+      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'TailFin_Position     ', TurbineComponents%TailFin%Position(:), TurbineComponents%TailFin%Orientation(:,:)
+
+      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'Tower_Position       ', TurbineComponents%Tower%Position(:),TurbineComponents%Tower%Orientation(:,:)
+
+      
+      WRITE( UNADPlt, '("AllAeroMarkers:")' )
+      DO IBlade=1,NB
+         DO IElement = 1,NElm
+            WRITE( UNADPlt, '(A,I1,A,I1,A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+              'Blade',IBlade,'_Elm',IElement,'_Position', InputMarkers%Blade(IElement,IBlade)%Position(:), &
+                                                          InputMarkers%Blade(IElement,IBlade)%Orientation(:,:)
+         END DO
+      END DO
+   
+   
+      CLOSE( UNADPlt )
+      CALL ProgAbort(' Closing program due to plot output file.')
+   END IF
+!BJJ end of plotting info
 
    !-------------------------------------------------------------------------------------------------
    ! Calculate the forces and moments for the blade: SUBROUTINE AeroFrcIntrface( FirstLoop, JElemt, DFN, DFT, PMA )
@@ -642,10 +723,12 @@ FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, Curren
          !-------------------------------------------------------------------------------------------
          ! reproduce GetVNVT routine:
          !-------------------------------------------------------------------------------------------
-         tmpVector =  -1.*SPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(1,:) + CPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(2,:)
+         tmpVector =  -1.*SPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(1,:) &
+                        + CPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(2,:)
          VTTotal   =     DOT_PRODUCT( tmpVector, VelocityVec - InputMarkers%Blade(IElement,IBlade)%TranslationVel  )
 
-         tmpVector =     CPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(1,:) + SPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(2,:)
+         tmpVector =     CPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(1,:) &
+                       + SPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(2,:)
          VNWind    =     DOT_PRODUCT( tmpVector, VelocityVec )
          VNElement = -1.*DOT_PRODUCT( tmpVector, InputMarkers%Blade(IElement,IBlade)%TranslationVel )  ! = DOT_PRODUCT( CurrentInputs%TransVel, -1.*Orientation )
 

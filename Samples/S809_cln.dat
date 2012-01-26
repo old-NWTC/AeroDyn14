@@ -1,9 +1,11 @@
-AeroDyn airfoil file.  Compatible with AeroDyn v13.0.
-S809 Airfoil, OSU data at Re=.75 Million, Clean roughness
+AeroDyn v13.00.00 airfoil file. S809 Airfoil, OSU data at Re=.75 Million, Clean roughness
 NREL/TP-442-7817 Appendix B, Viterna used aspect ratio=11
   1            Number of airfoil tables in this file
   9.0e9        Table ID parameter (Reynolds number in milllions).  For efficiency, make very large if only one table.
  15.3          Stall angle (deg)
+  0            No longer used, enter zero                              
+  0            No longer used, enter zero                              
+  0            No longer used, enter zero                              
  -0.38         Zero lift angle of attack (deg)
   7.12499      Cn slope for zero lift (dimensionless)
   1.9408       Cn at stall value for positive angle of attack
@@ -68,4 +70,3 @@ NREL/TP-442-7817 Appendix B, Viterna used aspect ratio=11
    160.00     -.460    .3172   -.1685
    170.00     -.230    .2116   -.5000
    180.00      .000    .1748    .0000
-EOT

@@ -51,12 +51,12 @@ REAL(ReKi)                   :: MulTabLoc = 0.0
 REAL(ReKi), ALLOCATABLE      :: MulTabMet ( :, :)
 REAL(ReKi)                   :: PMC
 
-INTEGER(4), PARAMETER        :: MAXTABLE = 10 !bjj: pjm increased this to 20
-INTEGER(4), ALLOCATABLE      :: NFOIL ( : )           ! indices of the airfoil data file used for each element
-INTEGER(4), ALLOCATABLE      :: NLIFT ( : )           ! Number of aerodata points in each airfoil file
-INTEGER(4), ALLOCATABLE      :: NTables  ( : )        ! number of airfoil data tables
-INTEGER(4)                   :: NumCL                 ! maximum number of aerodata points in all airfoil files {=max(NFoil(:)}
-INTEGER(4)                   :: NumFoil               ! number of different airfoil files used
+INTEGER   , PARAMETER        :: MAXTABLE = 10 !bjj: pjm increased this to 20
+INTEGER   , ALLOCATABLE      :: NFOIL ( : )           ! indices of the airfoil data file used for each element
+INTEGER   , ALLOCATABLE      :: NLIFT ( : )           ! Number of aerodata points in each airfoil file
+INTEGER   , ALLOCATABLE      :: NTables  ( : )        ! number of airfoil data tables
+INTEGER                      :: NumCL                 ! maximum number of aerodata points in all airfoil files {=max(NFoil(:)}
+INTEGER                      :: NumFoil               ! number of different airfoil files used
 
 CHARACTER(1024), ALLOCATABLE   :: FOILNM ( : )          ! names of the data files that contain airfoil data
 
@@ -160,7 +160,7 @@ REAL(ReKi), ALLOCATABLE      :: C       (:)     ! Chord of each blade element (F
 REAL(ReKi), ALLOCATABLE      :: DR      (:)     ! Span-wise width of the element (length of the element, centered at RELM(i)) (FROM INPUT FILE)
 REAL(ReKi)                   :: R               ! rotor radius
 
-INTEGER(4)                   :: NB              ! number of blades
+INTEGER                      :: NB              ! number of blades
 
 
 END MODULE Blade
@@ -174,13 +174,13 @@ MODULE DynInflow
 USE                             Precision
 
 
-INTEGER(4), PARAMETER        :: MAXINFL  = 6
-INTEGER(4), PARAMETER        :: MAXINFL0 = 2
-INTEGER(4)                   :: MminR    ( maxInfl, maxInfl )
-INTEGER(4)                   :: MminusR  ( maxInfl, maxInfl )
-INTEGER(4)                   :: MplusR   ( maxInfl, maxInfl )
-INTEGER(4)                   :: MRvector ( maxInfl )
-INTEGER(4)                   :: NJvector ( maxInfl )
+INTEGER   , PARAMETER        :: MAXINFL  = 6
+INTEGER   , PARAMETER        :: MAXINFL0 = 2
+INTEGER                      :: MminR    ( maxInfl, maxInfl )
+INTEGER                      :: MminusR  ( maxInfl, maxInfl )
+INTEGER                      :: MplusR   ( maxInfl, maxInfl )
+INTEGER                      :: MRvector ( maxInfl )
+INTEGER                      :: NJvector ( maxInfl )
 
 REAL(ReKi)                   :: dAlph_dt ( maxInfl, 4 )
 REAL(ReKi)                   :: dBeta_dt ( maxInfl0+1 : maxInfl, 4 )
@@ -227,8 +227,7 @@ REAL(ReKi), ALLOCATABLE      :: RELM    (:)         ! Location of the center of 
 REAL(ReKi), ALLOCATABLE      :: TLCNST  (:)         ! Tip-loss constant at each element
 REAL(ReKi), ALLOCATABLE      :: TWIST   (:)         ! Twist of each blade element  (INPUT FILE)
 
-INTEGER(4)                   :: NELM                ! Number of elements per blade (INPUT FILE)
-
+INTEGER                      :: NELM                ! Number of elements per blade (INPUT FILE)
 
 END MODULE Element
 !=======================================================================
@@ -276,15 +275,14 @@ REAL(ReKi), ALLOCATABLE      :: SaveVX  ( :,: )         ! The velocity in the x 
 REAL(ReKi), ALLOCATABLE      :: SaveVY  ( :,: )         ! The velocity in the y direction at requested element, on each blade
 REAL(ReKi), ALLOCATABLE      :: SaveVZ  ( :,: )         ! The velocity in the z direction at requested element, on each blade
 
-INTEGER(4)                   :: UnWndOut = 96           ! The unit for wind output at each element on each blade
-INTEGER(4)                   :: NumWndElOut             ! Number of wind elements to print
-INTEGER(4), ALLOCATABLE      :: WndElPrList (:)
-INTEGER(4), ALLOCATABLE      :: WndElPrNum  (:)
-
-INTEGER(4), ALLOCATABLE      :: ElPrList (:)
-INTEGER(4), ALLOCATABLE      :: ElPrNum  (:)
-INTEGER(4)                   :: NumElOut
-INTEGER(4)                   :: UnElem = 94
+INTEGER                      :: UnWndOut = 96           ! The unit for wind output at each element on each blade
+INTEGER                      :: NumWndElOut             ! Number of wind elements to print
+INTEGER   , ALLOCATABLE      :: WndElPrList (:)
+INTEGER   , ALLOCATABLE      :: WndElPrNum  (:)
+INTEGER   , ALLOCATABLE      :: ElPrList (:)
+INTEGER   , ALLOCATABLE      :: ElPrNum  (:)
+INTEGER                      :: NumElOut
+INTEGER                      :: UnElem = 94
 
 
 END MODULE ElOutParams
@@ -295,8 +293,8 @@ MODULE ErrCount
    ! Contains error counters.
 
 
-INTEGER(4)                   :: NumErr
-INTEGER(4)                   :: NumWarn
+INTEGER                      :: NumErr
+INTEGER                      :: NumWarn
 
 
 END MODULE ErrCount
@@ -428,3 +426,4 @@ REAL(ReKi)                   :: VROTORZ                                 !
 
 END MODULE Wind
 !=======================================================================
+

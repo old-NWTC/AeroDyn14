@@ -12,8 +12,10 @@ MODULE FDWind
     USE                     SharedInflowDefns
 
     IMPLICIT                NONE
-     
-        
+   PRIVATE
+  
+      ! FD_Wind
+      
    REAL(ReKi)                   :: DelXgrid                                   ! The nondimensional distance between grid points in the x direction.
    REAL(ReKi)                   :: DelYgrid                                   ! The nondimensional distance between grid points in the y direction.
    REAL(ReKi)                   :: DelZgrid                                   ! The nondimensional distance between grid points in the z direction.

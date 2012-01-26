@@ -58,5 +58,104 @@ MODULE SharedTypes
    END TYPE AeroConfig
 
 !====================================================================================================
+!CONTAINS
+!====================================================================================================
+!SUBROUTINE AllocateLoads(LoadVar,NB,NBEle,NHub,NNacelle,NTwr,NTail,ErrorStatus)
+!! Allocation subroutine for type AllAeroLoads
+!!----------------------------------------------------------------------------------------------------
+!
+!      ! Passed variables
+!
+!   TYPE(AllAeroLoads), INTENT(INOUT)   :: LoadVar
+!   INTEGER,            INTENT(IN)      :: NB                      ! Number of blades
+!   INTEGER,            INTENT(IN)      :: NBEle                   ! Number of elements per blade
+!   INTEGER,            INTENT(IN)      :: NHub                    ! Number of elements on the hub
+!   INTEGER,            INTENT(IN)      :: NNacelle                ! Number of elements on the nacelle
+!   INTEGER,            INTENT(IN)      :: NTwr                    ! Number of elements on the tower
+!   INTEGER,            INTENT(IN)      :: NTail                   ! Number of elements on the tail
+!   INTEGER,            INTENT(OUT)     :: ErrorStatus             ! Determines if an error was encountered
+!
+!
+!      ! Allocate the states
+!
+!
+!   IF (.NOT. ALLOCATED(LoadVar%Blade) .AND. NB*NBEle > 0 ) THEN
+!      ALLOCATE( LoadVar%Blade(NB,NBEle), STAT=ErrorStatus )
+!      IF (ErrorStatus /=0) RETURN
+!   ENDIF
+!
+!   IF (.NOT. ALLOCATED(LoadVar%Hub) .AND. NHub > 0 ) THEN
+!      ALLOCATE( LoadVar%Hub(NHub), STAT=ErrorStatus )
+!      IF (ErrorStatus /=0) RETURN
+!   ENDIF
+!
+!   IF (.NOT. ALLOCATED(LoadVar%Nacelle) .AND. NNacelle > 0 ) THEN
+!      ALLOCATE( LoadVar%Nacelle(NNacelle), STAT=ErrorStatus )
+!      IF (ErrorStatus /=0) RETURN
+!   ENDIF
+!
+!   IF (.NOT. ALLOCATED(LoadVar%Tower) .AND. NTwr > 0 ) THEN
+!      ALLOCATE( LoadVar%Tower(NTwr), STAT=ErrorStatus )
+!      IF (ErrorStatus /=0) RETURN
+!   ENDIF
+!
+!   IF (.NOT. ALLOCATED(LoadVar%Tail) .AND. NTail > 0 ) THEN
+!      ALLOCATE( LoadVar%Tail(NTail), STAT=ErrorStatus )
+!      IF (ErrorStatus /=0) RETURN
+!   ENDIF
+!
+!   ErrorStatus = 0
+!
+!
+!END SUBROUTINE AllocateLoads
+!!====================================================================================================
+!SUBROUTINE AllocateStates(StateVar,NB,NBEle,NHub,NNacelle,NTwr,NTail,ErrorStatus)
+!! Allocation subroutine for type AllAeroStates
+!!----------------------------------------------------------------------------------------------------
+!
+!      ! Passed variables
+!
+!   TYPE(AllAeroStates), INTENT(INOUT)  :: StateVar
+!   INTEGER,             INTENT(IN)     :: NB                      ! Number of blades
+!   INTEGER,             INTENT(IN)     :: NBEle                   ! Number of elements per blade
+!   INTEGER,             INTENT(IN)     :: NHub                    ! Number of elements on the hub
+!   INTEGER,             INTENT(IN)     :: NNacelle                ! Number of elements on the nacelle
+!   INTEGER,             INTENT(IN)     :: NTwr                    ! Number of elements on the tower
+!   INTEGER,             INTENT(IN)     :: NTail                   ! Number of elements on the tail
+!   INTEGER,             INTENT(OUT)    :: ErrorStatus             ! Determines if an error was encountered
+!
+!
+!      ! Allocate the states
+!
+!   IF (.NOT. ALLOCATED(StateVar%Blade) .AND. NB*NBEle > 0 ) THEN
+!      ALLOCATE( StateVar%Blade(NB,NBEle), STAT=ErrorStatus )
+!      IF (ErrorStatus /=0) RETURN
+!   ENDIF
+!
+!   IF (.NOT. ALLOCATED(StateVar%Hub) .AND. NHub > 0 ) THEN
+!      ALLOCATE( StateVar%Hub(NHub), STAT=ErrorStatus )
+!      IF (ErrorStatus /=0) RETURN
+!   ENDIF
+!
+!   IF (.NOT. ALLOCATED(StateVar%Nacelle) .AND. NNacelle > 0 ) THEN
+!      ALLOCATE( StateVar%Nacelle(NNacelle), STAT=ErrorStatus )
+!      IF (ErrorStatus /=0) RETURN
+!   ENDIF
+!
+!   IF (.NOT. ALLOCATED(StateVar%Tower) .AND. NTwr > 0 ) THEN
+!      ALLOCATE( StateVar%Tower(NTwr), STAT=ErrorStatus )
+!      IF (ErrorStatus /=0) RETURN
+!   ENDIF
+!
+!   IF (.NOT. ALLOCATED(StateVar%Tail) .AND. NTail > 0 ) THEN
+!      ALLOCATE( StateVar%Tail(NTail), STAT=ErrorStatus )
+!      IF (ErrorStatus /=0) RETURN
+!   ENDIF
+!
+!   ErrorStatus = 0
+!
+!
+!END SUBROUTINE AllocateStates
+!====================================================================================================
 
 END MODULE SharedTypes

@@ -741,23 +741,18 @@ SUBROUTINE ReadCTP( UnWind, FileName, CTPscaling, ErrStat )
    IF (ErrStat /= 0) RETURN
    
    
-   IF ( INDEX( CTPscaling%CTTSfile, ':') == 0 ) THEN !No drive is specified
-      IF ( INDEX( '/\', CTPscaling%CTTSfile(1:1)) == 0 ) THEN      
-         CALL GetPath( FileName, TmpPath ) 
-         CTPscaling%CTTSfile = TRIM(TmpPath)//TRIM(CTPscaling%CTTSfile)
-      END IF
-   END IF
-   
+   IF ( PathIsRelative( CTPscaling%CTTSfile ) ) THEN
+      CALL GetPath( FileName, TmpPath ) 
+      CTPscaling%CTTSfile = TRIM(TmpPath)//TRIM(CTPscaling%CTTSfile)
+   END IF      
 
    CALL ReadVar( UnWind, TRIM( FileName ), CTPscaling%CTbackgr, 'CTbackgr', 'File containing the background wind', ErrStat )
    IF (ErrStat /= 0) RETURN
 
-   IF ( INDEX( CTPscaling%CTbackgr, ':') == 0 ) THEN !No drive is specified
-      IF ( INDEX( '/\', CTPscaling%CTbackgr(1:1) ) == 0 ) THEN
-         CALL GetPath( FileName, TmpPath ) 
-         CTPscaling%CTbackgr = TRIM(TmpPath)//TRIM(CTPscaling%CTbackgr)
-      END IF
-   END IF
+   IF ( PathIsRelative( CTPscaling%CTbackgr ) ) THEN
+      CALL GetPath( FileName, TmpPath ) 
+      CTPscaling%CTbackgr = TRIM(TmpPath)//TRIM(CTPscaling%CTbackgr)
+   END IF      
 
 
    CALL ReadVar( UnWind, TRIM( FileName ), CT_DF_Y, 'CT_DF_Y', 'Decimation factor for wind data in the Y direction', ErrStat )

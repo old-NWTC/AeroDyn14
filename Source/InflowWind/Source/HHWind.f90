@@ -309,7 +309,7 @@ SUBROUTINE HH_Init(UnWind, WindFile, WindInfo, ErrStat)
    ENDIF
    
    IF ( NumDataLines == 1 ) THEN
-      CALL WrScr( 'Only 1 line in HH wind file. Steady, hub-height horizontal wind speed = '//TRIM(Flt2Lstr(V(1)))//' m/s.' )
+      CALL WrScr( ' Only 1 line in HH wind file. Steady, hub-height horizontal wind speed = '//TRIM(Flt2Lstr(V(1)))//' m/s.' )
    END IF
 
 
@@ -381,8 +381,7 @@ FUNCTION HH_GetWindSpeed(Time, InputPosition, ErrStat)
       VGust_tmp     = VGust  (1) + LinearizeDels(7)
 
       ! Let's check the limits.
-
-   ELSE IF ( Time <= Tdata(1) )  THEN
+   ELSE IF ( Time <= Tdata(1) .OR. NumDataLines == 1 )  THEN
    
       TimeIndx      = 1
       V_tmp         = V      (1)
@@ -490,13 +489,13 @@ FUNCTION HH_Get_ADHack_WindSpeed(Time, InputPosition, ErrStat)
    
       
    !-------------------------------------------------------------------------------------------------
-   ! Linearly interpolate in time (or used nearest-neighbor to extrapolate) 
+   ! Linearly interpolate in time (or use nearest-neighbor to extrapolate) 
    ! (compare with NWTC_Num.f90\InterpStpReal)
    !-------------------------------------------------------------------------------------------------
 
      ! Let's check the limits.
 
-   IF ( Time <= Tdata(1) )  THEN
+   IF ( Time <= Tdata(1) .OR. NumDataLines == 1)  THEN
    
       TimeIndx      = 1
       V_tmp         = V      (1)

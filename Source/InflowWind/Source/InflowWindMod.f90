@@ -7,57 +7,61 @@ MODULE InflowWind
 !
 ! Data are assumed to be in units of meters and seconds.  Z is measured from the ground (NOT the hub!).
 !
-!  7 Oct 2009    B. Jonkman, NREL/NWTC
+!  7 Oct 2009    Initial Release with AeroDyn 13.00.00      B. Jonkman, NREL/NWTC
+! 24 May 2010    v1.00.01                                   B. Jonkman
 !----------------------------------------------------------------------------------------------------  
 
-   USE                           NWTC_Library
-   USE                           SharedInflowDefns
+   USE                              NWTC_Library
+   USE                              SharedInflowDefns
    
    !-------------------------------------------------------------------------------------------------
    ! The included wind modules
    !-------------------------------------------------------------------------------------------------
    
-   USE                           FFWind               ! full-field binary wind files
-   USE                           HHWind               ! hub-height text wind files
-   USE                           FDWind               ! 4-D binary wind files
-   USE                           CTWind               ! coherent turbulence from KH billow - binary file superimposed on another wind type
-   USE                           UserWind             ! user-defined wind module
+   USE                              FFWind               ! full-field binary wind files
+   USE                              HHWind               ! hub-height text wind files
+   USE                              FDWind               ! 4-D binary wind files
+   USE                              CTWind               ! coherent turbulence from KH billow - binary file superimposed on another wind type
+   USE                              UserWind             ! user-defined wind module
+   USE                              HAWCWind             ! full-field binary wind files in HAWC format
    
 
-   IMPLICIT                      NONE
+   IMPLICIT                         NONE
    PRIVATE
 
    !-------------------------------------------------------------------------------------------------
    ! Private internal variables
    !-------------------------------------------------------------------------------------------------
 
-   INTEGER, SAVE               :: WindType = 0           ! Wind Type Flag   
-   INTEGER                     :: UnWind   = 91          ! The unit number used for wind inflow files
+   INTEGER, SAVE                  :: WindType = Undef_Wind  ! Wind Type Flag   
+
+   INTEGER                        :: UnWind   = 91          ! The unit number used for wind inflow files
    
-   LOGICAL, SAVE               :: CT_Flag  = .FALSE.     ! determines if coherent turbulence is used
+   LOGICAL, SAVE                  :: CT_Flag  = .FALSE.     ! determines if coherent turbulence is used
 
    !-------------------------------------------------------------------------------------------------
    ! Definitions of public types and routines
    !-------------------------------------------------------------------------------------------------
 
    TYPE, PUBLIC :: InflInitInfo
-      CHARACTER(1024)          :: WindFileName
-      INTEGER                  :: WindFileType
-      REAL(ReKi)               :: ReferenceHeight        ! reference height for HH and/or 4D winds (was hub height), in meters
-      REAL(ReKi)               :: Width                  ! width of the HH file (was 2*R), in meters
+      CHARACTER(1024)             :: WindFileName
+      INTEGER                     :: WindFileType
+      REAL(ReKi)                  :: ReferenceHeight        ! reference height for HH and/or 4D winds (was hub height), in meters
+      REAL(ReKi)                  :: Width                  ! width of the HH file (was 2*R), in meters
    END TYPE InflInitInfo
 
-   PUBLIC                      :: WindInf_Init           ! Initialization subroutine
-   PUBLIC                      :: WindInf_GetVelocity    ! function to get wind speed at point in space and time
-   PUBLIC                      :: WindInf_GetMean        ! function to get the mean wind speed at a point in space
-   PUBLIC                      :: WindInf_GetStdDev      ! function to calculate standard deviation at a point in space
-   PUBLIC                      :: WindInf_GetTI          ! function to get TI at a point in space
-   PUBLIC                      :: WindInf_Terminate      ! subroutine to clean up
+   PUBLIC                         :: WindInf_Init           ! Initialization subroutine
+   PUBLIC                         :: WindInf_GetVelocity    ! function to get wind speed at point in space and time
+   PUBLIC                         :: WindInf_GetMean        ! function to get the mean wind speed at a point in space
+   PUBLIC                         :: WindInf_GetStdDev      ! function to calculate standard deviation at a point in space
+   PUBLIC                         :: WindInf_GetTI          ! function to get TI at a point in space
+   PUBLIC                         :: WindInf_Terminate      ! subroutine to clean up
    
-   PUBLIC                      :: WindInf_ADhack_diskVel ! used to keep old AeroDyn functionality--remove soon!
-   PUBLIC                      :: WindInf_ADhack_DIcheck ! used to keep old AeroDyn functionality--remove soon!
-   PUBLIC                      :: WindInf_LinearizePerturbation !used for linearization; should be modified
+   PUBLIC                         :: WindInf_ADhack_diskVel ! used to keep old AeroDyn functionality--remove soon!
+   PUBLIC                         :: WindInf_ADhack_DIcheck ! used to keep old AeroDyn functionality--remove soon!
+   PUBLIC                         :: WindInf_LinearizePerturbation !used for linearization; should be modified
 
+   CHARACTER(99),PARAMETER        :: WindInfVer = 'InflowWind (v1.00.01b-bjj, 14 Nov 2011)'
 
 CONTAINS
 !====================================================================================================
@@ -79,10 +83,9 @@ SUBROUTINE WindInf_Init( FileInfo, ErrStat )
    REAL(ReKi)                       :: Height
    REAL(ReKi)                       :: HalfWidth
    CHARACTER(1024)                  :: FileName
-         
+              
    
-   
-   IF ( WindType /= 0 ) THEN  
+   IF ( WindType /= Undef_Wind ) THEN  
       CALL WrScr( ' Wind inflow has already been initialized.' )
       ErrStat = 1
       RETURN
@@ -90,6 +93,8 @@ SUBROUTINE WindInf_Init( FileInfo, ErrStat )
       WindType = FileInfo%WindFileType         
       FileName = FileInfo%WindFileName 
       CALL NWTC_Init()
+      CALL WrScr1( ' Using '//TRIM( WindInfVer ) )  
+
    END IF
 
    !-------------------------------------------------------------------------------------------------
@@ -110,7 +115,7 @@ SUBROUTINE WindInf_Init( FileInfo, ErrStat )
       CALL CT_Init(UnWind, FileName, BackGrndValues, ErrStat)      
       IF (ErrStat /= 0) THEN
          CALL WindInf_Terminate( ErrStat )
-         WindType = 0
+         WindType = Undef_Wind
          ErrStat  = 1
          RETURN
       END IF
@@ -170,6 +175,9 @@ SUBROUTINE WindInf_Init( FileInfo, ErrStat )
       
          CALL FD_Init(UnWind, FileName, FileInfo%ReferenceHeight, ErrStat)
       
+      CASE (HAWC_Wind)
+         
+         CALL HW_Init( UnWind, FileName, ErrStat )      
       
       CASE DEFAULT
       
@@ -181,7 +189,7 @@ SUBROUTINE WindInf_Init( FileInfo, ErrStat )
 
    IF ( ErrStat /= 0 ) THEN
       CALL WindInf_Terminate( ErrStat )  !Just in case we've allocated something
-      WindType = 0
+      WindType = Undef_Wind
       ErrStat  = 1
    END IF
       
@@ -217,6 +225,9 @@ FUNCTION WindInf_GetVelocity(Time, InputPosition, ErrStat)
       
       CASE (FD_Wind)
          WindInf_GetVelocity = FD_GetWindSpeed(     Time, InputPosition, ErrStat )
+
+      CASE (HAWC_Wind)
+         WindInf_GetVelocity = HW_GetWindSpeed(     Time, InputPosition, ErrStat )
       
       CASE DEFAULT
          CALL WrScr(' Error: Undefined wind type in WindInf_GetVelocity(). ' &
@@ -503,6 +514,7 @@ FUNCTION GetWindType( FileName, ErrStat )
    CHARACTER(  3)             :: FileNameEnd
    CHARACTER(  8)             :: WndFilNam
 
+   CHARACTER(1024)            :: FileRoot
 
 
    ErrStat = 0
@@ -525,9 +537,16 @@ FUNCTION GetWindType( FileName, ErrStat )
    !-------------------------------------------------------------------------------------------------
    ! Get the file extension (or at least what we expect the extension to be)
    !-------------------------------------------------------------------------------------------------   
-   IND         = INDEX( FileName, '.', BACK=.TRUE. )    ! Find the last period in the file name - to determine file extension   
-   FileNameEnd = FileName(IND+1:)                       ! Get the extenstion (may not be the whole "extension")
-   CALL Conv2UC (FileNameEnd)       
+   CALL GetRoot ( FileName, FileRoot )                      ! Get the root name
+   
+   IND = LEN_TRIM( FileRoot ) + 1
+   IF ( IND < LEN_TRIM( FileName ) ) THEN
+      FileNameEnd = FileName(IND+1:)                        ! Get the extenstion, starting at first character past (may not be the whole "extension")
+      CALL Conv2UC (FileNameEnd)       
+   ELSE
+      FileNameEnd = ""
+      IND = 0
+   END IF            
 
 
    !-------------------------------------------------------------------------------------------------
@@ -571,6 +590,10 @@ FUNCTION GetWindType( FileName, ErrStat )
          CALL WrScr1(' Assuming '//TRIM(FileName)//' is a binary 4-dimensional wind file.')
          GetWindType = FD_Wind
          
+      CASE ('HWC')
+         CALL WrScr1(' Assuming '//TRIM(FileName)//' contains full-field wind parameters in HAWC format.')
+         GetWindType = HAWC_Wind
+         
       CASE DEFAULT
          CALL WrScr1(' Assuming '//TRIM(FileName)//' is a formatted HH wind file.')
          GetWindType = HH_Wind
@@ -601,7 +624,7 @@ SUBROUTINE WindInf_LinearizePerturbation( LinPerturbations, ErrStat )
       
          CALL HH_SetLinearizeDels( LinPerturbations, ErrStat )   
      
-      CASE ( FF_Wind, UD_Wind, FD_Wind )
+      CASE ( FF_Wind, UD_Wind, FD_Wind, HAWC_Wind )
       
          CALL WrScr( ' Error: Linearization is valid only with HH wind files.' )
          ErrStat = 1
@@ -721,6 +744,10 @@ FUNCTION WindInf_ADhack_diskVel( Time, InpPosition, ErrStat )
          END DO
          WindInf_ADhack_diskVel(:) = 0.25*WindInf_ADhack_diskVel(:)
       
+      CASE (HAWC_Wind)
+         WindInf_ADhack_diskVel(1)   = HW_GetValue('UREF', ErrStat)
+         WindInf_ADhack_diskVel(2:3) = 0.0
+      
       CASE DEFAULT
          CALL WrScr(' Error: Undefined wind type in WindInf_ADhack_diskVel(). '// &
                     'Call WindInflow_Init() before calling this function.' )
@@ -756,6 +783,10 @@ FUNCTION WindInf_ADhack_DIcheck( ErrStat )
       CASE (FF_Wind)     
          
          WindInf_ADhack_DIcheck = FF_GetValue('MEANFFWS', ErrStat)
+         
+      CASE (HAWC_Wind)
+
+         WindInf_ADhack_DIcheck = HW_GetValue('UREF', ErrStat)      
       
       CASE DEFAULT
          CALL WrScr(' Error: Undefined wind type in WindInf_ADhack_DIcheck(). '// &
@@ -797,7 +828,13 @@ SUBROUTINE WindInf_Terminate( ErrStat )
       CASE (FD_Wind)
          CALL FD_Terminate(     ErrStat )
       
-      CASE DEFAULT
+      CASE (HAWC_Wind)
+         CALL HW_Terminate(     ErrStat )
+      
+      CASE ( Undef_Wind )
+         ! Do nothing
+         
+      CASE DEFAULT  ! keep this check to make sure that all new wind types have a terminate function
          CALL WrScr(' Undefined wind type in WindInf_Terminate().' )
          ErrStat = 1  
          
@@ -808,8 +845,7 @@ SUBROUTINE WindInf_Terminate( ErrStat )
    
    
       ! Reset the wind type so that the initialization routine must be called
-   
-   WindType = 0               
+  WindType = Undef_Wind               
    CT_Flag  = .FALSE.
 
 

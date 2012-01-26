@@ -109,10 +109,13 @@ SUBROUTINE FF_Init ( UnWind, BinFile, ErrStat )
    CALL OpenBInpFile (UnWind, TRIM(BinFile), ErrStat)
    IF (ErrStat /= 0) RETURN
       
-   READ (UnWind)  Dum_Int2
-
+   READ (UnWind, IOSTAT=ErrStat)  Dum_Int2
    CLOSE( UnWind )
    
+   IF (ErrStat /= 0) THEN
+      CALL WrScr( ' Error reading first binary integer from file "'//TRIM(BinFile)//'."' )
+      RETURN
+   END IF
    
       !----------------------------------------------------------------------------------------------
       ! Read the files to get the required FF data.
@@ -497,7 +500,7 @@ SUBROUTINE Read_Bladed_FF_Header1 (UnWind, TI, ErrStat)
                                   
       CASE DEFAULT
       
-         CALL ProgWarn( ' AeroDyn does not recognize the Full field turbulence file type ='//TRIM(Int2LStr(TurbType))//'.' )
+         CALL ProgWarn( ' AeroDyn does not recognize the full-field turbulence file type ='//TRIM(Int2LStr(TurbType))//'.' )
                   
    END SELECT !TurbType
 
@@ -852,7 +855,7 @@ SUBROUTINE Read_Summary_FF ( UnWind, FileName, CWise, ZCenter, TI, ErrStat )
    INTEGER,     INTENT(OUT)   :: ErrStat        ! returns 0 if no error encountered in the subroutine
    
    REAL(ReKi)                 :: ZGOffset       ! The vertical offset of the turbine on rectangular grid (allows turbulence not centered on turbine hub)
-     
+
    
    INTEGER, PARAMETER         :: NumStrings = 5 ! number of strings to be looking for in the file
 
@@ -1684,7 +1687,7 @@ END FUNCTION FF_GetWindSpeed
 !====================================================================================================
 FUNCTION FF_Interp(Time, Position, ErrStat)
 !    This function is used to interpolate into the full-field wind array or tower array if it has   
-!    been defined and is and necessary for the given inputs.  It receives X, Y, Z and
+!    been defined and is necessary for the given inputs.  It receives X, Y, Z and
 !    TIME from the calling routine.  It then computes a time shift due to a nonzero X based upon 
 !    the average windspeed.  The modified time is used to decide which pair of time slices to interpolate
 !    within and between.  After finding the two time slices, it decides which four grid points bound the 
@@ -1757,7 +1760,7 @@ FUNCTION FF_Interp(Time, Position, ErrStat)
 
 ! bjj: should we shift by MIN(FFYHWid,FFZHWid) instead of FFYHWid?
 
-   TimeShifted = TIME + ( FFYHWid - Position(1) )*InvMFFWS    ! in distance, X: (TIME*MeanFFWS + FFYHWid) - InputInfo%Position(1))
+   TimeShifted = TIME + ( FFYHWid - Position(1) )*InvMFFWS    ! in distance, X: -(TIME*MeanFFWS + FFYHWid) - InputInfo%Position(1))
    TGRID       = TimeShifted*FFRate
 
    ITLO = INT( TGRID ) + 1             ! convert REAL to INTEGER, then add one since our grids start at 1, not 0
@@ -1824,7 +1827,7 @@ FUNCTION FF_Interp(Time, Position, ErrStat)
       
       IF ( NTGrids < 1 ) THEN
          CALL WrScr ( ' Error: FF wind array boundaries violated. Grid too small in Z direction '// &
-                       '(height (Z='//TRIM(Flt2LStr(Position(3)))//' m) is below the grid and no tower points are defined).' )        
+                       '(height (Z='//TRIM(Flt2LStr(Position(3)))//' m) is below the grid and no tower points are defined).' )
          ErrStat = 1
          RETURN
       END IF
@@ -1980,3 +1983,4 @@ SUBROUTINE FF_Terminate( ErrStat )
 END SUBROUTINE FF_Terminate
 !====================================================================================================
 END MODULE FFWind
+

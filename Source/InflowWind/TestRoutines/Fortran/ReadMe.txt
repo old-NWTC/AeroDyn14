@@ -13,6 +13,7 @@ To compile, you will need to add the following files to your project
       SharedInflowDefs.f90
       CTWind.f90
       FDWind.f90
+      HAWCWind.f90
       FFWind.f90
       HHWind.f90
       UserWind.f90

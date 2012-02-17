@@ -11,6 +11,7 @@ MODULE AeroDyn
 !  ..................................................................................................
 !  v13.00.00a-bjj    31 Mar 2010         B. Jonkman           NREL/NWTC
 !  v13.00.00         20 Jan 2012         B. Jonkman           NREL/NWTC
+!  v13.00.01a-bjj    16 Feb 2012         B. Jonkman           NREL/NWTC
 !----------------------------------------------------------------------------------------------------
    USE                        NWTC_Library
    USE                        SharedTypes !bjj: replace with MODULE SharedDataTypes, which will be in the NWTC Library (to share definitions with HydroDyn)
@@ -30,7 +31,7 @@ MODULE AeroDyn
    !-------------------------------------------------------------------------------------------------
    ! Public data
    !-------------------------------------------------------------------------------------------------
-   TYPE(ProgDesc), PARAMETER, PUBLIC :: AD_Prog = ProgDesc( 'AeroDyn', '(v13.00.01a-bjj, 30-Jan-2012)' )   ! the name/version/date of the Aerodynamics program
+   TYPE(ProgDesc), PARAMETER, PUBLIC :: AD_Prog = ProgDesc( 'AeroDyn', '(v13.00.01a-bjj, 16-Feb-2012)' )   ! the name/version/date of the Aerodynamics program
 
 
    !-------------------------------------------------------------------------------------------------

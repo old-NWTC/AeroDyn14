@@ -61,7 +61,7 @@ MODULE InflowWind
    PUBLIC                         :: WindInf_ADhack_DIcheck ! used to keep old AeroDyn functionality--remove soon!
    PUBLIC                         :: WindInf_LinearizePerturbation !used for linearization; should be modified
 
-   CHARACTER(99),PARAMETER        :: WindInfVer = 'InflowWind (v1.00.01b-bjj, 14 Nov 2011)'
+   CHARACTER(99),PARAMETER        :: WindInfVer = 'InflowWind (v1.00.01b-bjj, 14-Nov-2011)'
 
 CONTAINS
 !====================================================================================================

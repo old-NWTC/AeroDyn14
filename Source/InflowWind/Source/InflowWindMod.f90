@@ -8,7 +8,7 @@ MODULE InflowWind
 ! Data are assumed to be in units of meters and seconds.  Z is measured from the ground (NOT the hub!).
 !
 !  7 Oct 2009    Initial Release with AeroDyn 13.00.00      B. Jonkman, NREL/NWTC
-! 24 May 2010    v1.00.01                                   B. Jonkman
+! 14 Nov 2011    v1.00.01b-bjj                              B. Jonkman
 !----------------------------------------------------------------------------------------------------  
 
    USE                              NWTC_Library

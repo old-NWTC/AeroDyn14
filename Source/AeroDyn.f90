@@ -865,8 +865,8 @@ FUNCTION AD_GetCurrentValue(VarName, ErrStat, IBlade, IElement)
 !  If the name is not recognized, an error is returned in ErrStat.
 !----------------------------------------------------------------------------------------------------
 
-   USE                           :: Rotor,      ONLY: AvgInfl
-   USE                           :: ElemInflow, ONLY: W2, Alpha
+   USE                           Rotor,      ONLY: AvgInfl
+   USE                           ElemInflow, ONLY: W2, Alpha
 
 
    CHARACTER(*),      INTENT(IN) :: VarName

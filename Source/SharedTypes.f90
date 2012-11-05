@@ -39,10 +39,10 @@ MODULE SharedTypes
       TYPE(Load),  ALLOCATABLE   :: Tail(:)
    END TYPE AllAeroLoads
 
-   TYPE, PUBLIC :: ProgDesc !do we want to add date as well?
-      CHARACTER(20)              :: Name
-      CHARACTER(99)              :: Ver
-   END TYPE ProgDesc
+!   TYPE, PUBLIC :: ProgDesc !do we want to add date as well?
+!      CHARACTER(20)              :: Name
+!      CHARACTER(99)              :: Ver
+!   END TYPE ProgDesc
 
 
    TYPE, PUBLIC :: AeroConfig

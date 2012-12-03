@@ -31,7 +31,7 @@ MODULE AeroDyn
    !-------------------------------------------------------------------------------------------------
    ! Public data
    !-------------------------------------------------------------------------------------------------
-   TYPE(ProgDesc), PARAMETER, PUBLIC :: AD_Prog = ProgDesc( 'AeroDyn', '(v13.00.01a-bjj, 16-Feb-2012)' )   ! the name/version/date of the Aerodynamics program
+   TYPE(ProgDesc), PARAMETER, PUBLIC :: AD_Prog = ProgDesc( 'AeroDyn', '(v13.00.01b-bjj, 28-Aug-2012)' )   ! the name/version/date of the Aerodynamics program
 
 
    !-------------------------------------------------------------------------------------------------

@@ -710,6 +710,8 @@ FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, Curren
             
          IF ( CurrentADOptions%SetMulTabLoc(IElement,IBlade)  ) THEN
             MulTabLoc = CurrentADOptions%MulTabLoc(IElement,IBlade)
+         ELSE
+            MulTabLoc = 0.0
          END IF
          
 

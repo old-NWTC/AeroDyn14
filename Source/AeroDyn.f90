@@ -1,107 +1,81 @@
-MODULE AeroDyn
-!  ..................................................................................................
-!  AeroDyn
-!  ..................................................................................................
-!  National Wind Technology Center
-!  National Renewable Energy Laboratory
-!  Golden, Colorado, USA
+!**********************************************************************************************************************************
+! LICENSING
+! Copyright (C) 2012  National Renewable Energy Laboratory
 !
-!  Originally created by
-!  Windward Engineering, LC
-!  ..................................................................................................
-!  v13.00.00a-bjj    31 Mar 2010         B. Jonkman           NREL/NWTC
-!  v13.00.00         20 Jan 2012         B. Jonkman           NREL/NWTC
-!  v13.00.01a-bjj    16 Feb 2012         B. Jonkman           NREL/NWTC
-!----------------------------------------------------------------------------------------------------
-   USE                        NWTC_Library
-   USE                        SharedTypes !bjj: replace with MODULE SharedDataTypes, which will be in the NWTC Library (to share definitions with HydroDyn)
+!    This file is part of AeroDyn.
+!
+! Licensed under the Apache License, Version 2.0 (the "License");
+! you may not use this file except in compliance with the License.
+! You may obtain a copy of the License at
+!
+!     http://www.apache.org/licenses/LICENSE-2.0
+!
+! Unless required by applicable law or agreed to in writing, software
+! distributed under the License is distributed on an "AS IS" BASIS,
+! WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+! See the License for the specific language governing permissions and
+! limitations under the License.
+!
+!**********************************************************************************************************************************
+! File last committed: $Date$
+! (File) Revision #: $Rev$
+! URL: $HeadURL$
+!**********************************************************************************************************************************
+MODULE AeroDyn
 
-   USE                        InflowWind
-   USE                        SharedInflowDefns
-
+   USE AeroDyn_Types
+   USE AeroSubs
+   USE NWTC_Library
 
    IMPLICIT NONE
-   PUBLIC  !BJJ: note that this is a little different than the typical "PRIVATE" unless explicitly
-           !stated.  The reason is that now we can just say "USE AeroDyn" and include all the public
-           !components of InflowWind, SharedTypes, SharedInflowDefs, etc instead of having to
-           !explicitly include those modules, too.  However, care must be taken to explicitly state
-           !which variables should be PRIVATE!
+
+   PRIVATE
+
+   TYPE(ProgDesc), PARAMETER            :: AD_Ver = ProgDesc( 'AeroDyn', 'v14.02.00c-mlb', '02-Oct-2013' )
+
+      ! ..... Public Subroutines ............
+
+   PUBLIC :: AD_Init                           ! Initialization routine
+   PUBLIC :: AD_End                            ! Ending routine (includes clean up)
+
+   PUBLIC :: AD_UpdateStates                   ! Loose coupling routine for solving for constraint states, integrating
+                                                    !   continuous states, and updating discrete states
+   PUBLIC :: AD_CalcOutput                     ! Routine for computing outputs
+
+   PUBLIC :: AD_CalcConstrStateResidual        ! Tight coupling routine for returning the constraint state residual
+   PUBLIC :: AD_CalcContStateDeriv             ! Tight coupling routine for computing derivatives of continuous states
+   PUBLIC :: AD_UpdateDiscState                ! Tight coupling routine for updating discrete states
 
 
-   !-------------------------------------------------------------------------------------------------
-   ! Public data
-   !-------------------------------------------------------------------------------------------------
-   TYPE(ProgDesc), PARAMETER, PUBLIC :: AD_Prog = ProgDesc( 'AeroDyn', 'v13.00.02a-bjj', '20-Feb-2013' )   ! the name/version/date of the Aerodynamics program
+! Note that the following routines will be updated with new definitions of arrays returned (no longer one-byte arrays)
+!   PUBLIC :: AD_Pack                           ! Routine to pack (save) data into one array of bytes
+!   PUBLIC :: AD_Unpack                         ! Routine to unpack an array of bytes into data structures usable by the module
 
-
-   !-------------------------------------------------------------------------------------------------
-   ! Public types and procedures (subroutines/functions)
-   !-------------------------------------------------------------------------------------------------
-   PUBLIC :: AD_Init
-   PUBLIC :: AD_CalculateLoads
-   PUBLIC :: AD_GetUndisturbedWind
-   PUBLIC :: AD_GetCurrentValue
-   PUBLIC :: AD_GetConstant
-   PUBLIC :: AD_Terminate
-
-
-   TYPE, PUBLIC :: AD_InitOptions
-      CHARACTER(1024)            :: ADInputFile             ! Name of the AeroDyn input file
-      CHARACTER(1024)            :: OutRootName             ! Root name of the AeroDyn summary and element files
-      LOGICAL                    :: WrSumFile               ! T/F: Write an AeroDyn summary file
-   END TYPE AD_InitOptions
-
-
-
-   TYPE, PUBLIC :: AeroLoadsOptions
-      LOGICAL   ,ALLOCATABLE     :: SetMulTabLoc(:,:)
-      REAL(ReKi),ALLOCATABLE     :: MulTabLoc(:,:)                      ! MulTabLoc from GetElemParams()
-      LOGICAL                    :: LinearizeFlag
-   END TYPE AeroLoadsOptions
-
-   !-------------------------------------------------------------------------------------------------
-   ! Internal variables and types
-   !-------------------------------------------------------------------------------------------------
-   LOGICAL, PRIVATE, SAVE            :: Initialized        = .FALSE.
-   LOGICAL, PRIVATE, SAVE            :: NoLoadsCalculated  = .TRUE.
-   
-!BJJ start of plotting info
-   LOGICAL, PRIVATE, PARAMETER       :: OutputPlottingInfo = .false. !BJJ SET THIS = .FALSE. !!!!
-   INTEGER, PRIVATE, PARAMETER       :: UNADPlt            = 70
-!BJJ end of plotting info
-
-   REAL(ReKi), PRIVATE               :: TwoPiNB                         ! 2*pi/number of blades
-   TYPE(AllAeroLoads), PRIVATE       :: ADCurrentLoads                  ! copy of current loads to return
-
-
-!====================================================================================================
 CONTAINS
-!====================================================================================================
-FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
-! The AeroDyn initialization subroutine
-!----------------------------------------------------------------------------------------------------
-
-   USE               Switch,        ONLY: ELEMPRN, DynInfl
-   USE               AD_IOParams,   ONLY: WrOptFile, UnADopt, UnADIn
-   USE               AeroSubs,      ONLY: AD_GetInput, ADOut, CheckRComp
-   USE               AeroTime,      ONLY: Time, OldTime, dtAero
+!----------------------------------------------------------------------------------------------------------------------------------
+SUBROUTINE AD_Init( InitInp, u, p, x, xd, z, O, y, Interval, InitOut, ErrStat, ErrMess )
+!..................................................................................................................................
    USE               AeroGenSubs,   ONLY: ElemOpen
-   USE               Blade,         ONLY: NB, R, DR
-   USE               Element,       ONLY: HLCNST, TLCNST, NELM, RELM, TWIST
-   USE               Rotor,         ONLY: HH, AvgInfl
-   USE               InducedVel,    ONLY: SumInfl
-   USE               ElemInflow,    ONLY: W2, Alpha
+   IMPLICIT NONE
 
-
-      ! Passed variables
-
-   TYPE(AD_InitOptions),INTENT(IN)  :: ADOptions               ! Options for AeroDyn
-   TYPE(AeroConfig),    INTENT(IN)  :: TurbineComponents       ! initial configuration of the turbine components
-   INTEGER,             INTENT(OUT) :: ErrStat                 ! Determines if an error was encountered
-
-
-      ! Function definition
-   TYPE(AllAeroMarkers)             :: AD_Init
+   TYPE(AD_InitInputType),       INTENT(INOUT)  :: InitInp     ! Input data for initialization routine
+   TYPE(AD_InputType),           INTENT(  OUT)  :: u           ! An initial guess for the input; input mesh must be defined
+   TYPE(AD_ParameterType),       INTENT(  OUT)  :: p           ! Parameters
+   TYPE(AD_ContinuousStateType), INTENT(  OUT)  :: x           ! Initial continuous states
+   TYPE(AD_DiscreteStateType),   INTENT(  OUT)  :: xd          ! Initial discrete states
+   TYPE(AD_ConstraintStateType), INTENT(  OUT)  :: z           ! Initial guess of the constraint states
+   TYPE(AD_OtherStateType),      INTENT(  OUT)  :: O !therState  Initial other/optimization states
+   TYPE(AD_OutputType),          INTENT(  OUT)  :: y           ! Initial system outputs (outputs are not calculated;
+                                                               !   only the output mesh is initialized)
+   REAL(DbKi),                   INTENT(INOUT)  :: Interval    ! Coupling interval in seconds: the rate that
+                                                               !   (1) AD_UpdateStates() is called in loose coupling &
+                                                               !   (2) AD_UpdateDiscState() is called in tight coupling.
+                                                               !   Input is the suggested time from the glue code;
+                                                               !   Output is the actual coupling interval that will be used
+                                                               !   by the glue code.
+   TYPE(AD_InitOutputType),      INTENT(  OUT)  :: InitOut     ! Output for initialization routine
+   INTEGER(IntKi),                    INTENT(  OUT)  :: ErrStat     ! Error status of the operation
+   CHARACTER(*),                      INTENT(  OUT)  :: ErrMess     ! Error message if ErrStat /= ErrID_None
 
 
       ! Internal variables
@@ -111,153 +85,223 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
    REAL(ReKi)                       :: MeanWind
    REAL(ReKi)                       :: TipRadius
    REAL(ReKi)                       :: TmpVar
+   REAL(ReKi)                       :: TmpPos(3)
+   REAL(ReKi)                                :: TwrNodeHt                     ! The height of the current tower node.
 
-   INTEGER                          :: IB
-   INTEGER                          :: Ielm
-
-   TYPE(InflInitInfo)               :: InitWindInfl
+   INTEGER                          :: IB, IE, NB
+   INTEGER                          :: IELM
 
    CHARACTER(1024)                  :: Title
 
+   INTEGER(IntKi)                   :: ErrStat2          ! Error status of the operation
+   CHARACTER(LEN(ErrMess))           :: ErrMess2           ! Error message
+   INTEGER                                   :: Elem                          ! Index for mesh element.
+   INTEGER                                   :: ErrStatLcL        ! Error status returned by called routines.
+   INTEGER                                   :: InterpIndx                 ! Index telling the interpolation routine where to start in the array.
+   INTEGER                                   :: Node                          ! Index used to pull points out of the array of values at given node location.
+
+   CHARACTER(1024)                           :: ErrMessLcl          ! Error message returned by called routines.
+
+      ! Function definition
+
+         ! Initialize ErrStat
+
+   ErrStat = ErrID_None
+   ErrMess  = ""
+   ErrMessLcl = '<none>'
+   InterpIndx = 1
+   ErrStatLcL = ErrID_None
    !-------------------------------------------------------------------------------------------------
    ! Check that the module hasn't already been initialized.
    !-------------------------------------------------------------------------------------------------
-   IF ( Initialized ) THEN
+
+   IF ( p%Initialized ) THEN
       CALL WrScr( ' AeroDyn has already been initialized.' )
-      ErrStat = 1
+      ErrStat = ErrID_Warn
       RETURN
    ELSE
-      ErrStat = 0
-      CALL NWTC_Init()
+      p%Initialized = .TRUE.
+      ErrStat = ErrID_None
+      CALL NWTC_Init( )
    END IF
 
+         ! Display the module information
 
-   !-------------------------------------------------------------------------------------------------
-   ! Write the program name and version to the screen
-   !-------------------------------------------------------------------------------------------------
-   CALL DispNVD( AD_Prog )
+   CALL DispNVD( AD_Ver )
 
+   InitOut%Ver = AD_Ver
+   O%FirstWarn = .TRUE.
    !-------------------------------------------------------------------------------------------------
    ! Set up AD variables
    !-------------------------------------------------------------------------------------------------
-   NB = SIZE( TurbineComponents%Blade )
-   
-   WrOptFile   = ADOptions%WrSumFile
 
+   p%LinearizeFlag     = .FALSE. !InitInp%LinearizeFlag
+   p%Blade%BladeLength = InitInp%TurbineComponents%BladeLength
+
+
+         ! Define parameters here:
+
+   p%WrOptFile   = InitInp%WrSumFile
+
+   NB   = SIZE( InitInp%TurbineComponents%Blade )
    IF ( NB < 1 ) THEN
-      CALL ProgWarn( ' Error: AeroDyn cannot run without blades in the model.' )
-      ErrStat = 1
+      ErrMess = ' Error: AeroDyn cannot run without blades in the model.'
+      ErrStat = ErrID_Fatal
       RETURN
    END IF
+!bjj: what's the difference between p%NumBl, p%Blade%NB, and InitInp%NumBl?
+!MLB: Heck if I know!
+   p%NumBl  = NB
+   p%Blade%NB = NB
 
-!   !-------------------------------------------------------------------------------------------------
-!   ! Open the echo file if desired !bjj: there is a conflict with FAST having its echo file open already...
-!   !-------------------------------------------------------------------------------------------------
-!   IF (WrOptFile) THEN
-!      CALL OpenEcho( UnADopt, TRIM(ADOptions%OutRootName)//'.opt', ErrStat)
-!      IF (ErrStat /= 0 ) RETURN
-!
-!      WRITE (UnEc,"(/'This file was generated by ', A , ' on ', A, ' at ', A , '.')")  &
-!                     TRIM(GetNVD(AD_Prog)), CurDate(), CurTime()
-!   END IF
+   IF (.NOT. ALLOCATED( u%TurbineComponents%Blade ) ) THEN
+      ALLOCATE( u%TurbineComponents%Blade( NB ), STAT = ErrStat )
+      IF ( ErrStat /= 0 ) THEN
+         ErrMess = ' Error allocating space for u%TurbineComponents%Blade.'
+         ErrStat = ErrID_Fatal
+         RETURN         
+      END IF
+   END IF
 
+
+         ! Define initial system states here:
    !-------------------------------------------------------------------------------------------------
    ! Read the AeroDyn input file and open the output file if requested
    ! bjj: these should perhaps be combined
    !-------------------------------------------------------------------------------------------------
-
-   CALL AD_GetInput(UnADin, ADOptions%ADInputFile, InitWindInfl%WindFileName, Title, ErrStat )
+   CALL AD_GetInput(InitInp, P, x, xd, z, O, y, ErrStat, ErrMess )
    IF (ErrStat /= 0 ) RETURN
 
-!------
-!bjj: these should all be placed in one nice subroutine...
-!   CALL AllocateAeroDynArrays()
-   IF (.NOT. ALLOCATED(W2) ) THEN
-      ALLOCATE(W2(NELM,NB), STAT=ErrStat)
+   p%WindFileName      = InitInp%WindFileName ! InitInp%WindFileName  gets set in AD_GetInput
+
+
+      ! allocate variables for aerodyn forces
+   IF (.NOT. ALLOCATED(u%MulTabLoc)) THEN
+      ALLOCATE( u%MulTabLoc(p%Element%NELM, NB), STAT = ErrStat )
+      IF ( ErrStat /= 0 ) CALL ProgAbort ( ' Error allocating memory for u%MulTabLoc array.' )
+   END IF
+
+   u%MulTabLoc(:,:) = 0.0
+   p%LinearizeFlag     = .FALSE.
+
+
+   p%NumBl  = NB
+   p%Blade%NB = NB
+
+   Interval = p%DtAero
+
+   ALLOCATE( u%InputMarkers(NB) )
+   ALLOCATE( y%OutputLoads(NB) )
+!   ALLOCATE( o%StoredLoads%Blade(NB) )
+
+
+   DO IB = 1, NB
+     CALL MeshCreate( BlankMesh      = u%InputMarkers(IB)  &
+                     ,IOS            = COMPONENT_INPUT          &
+                     ,NNodes         = p%Element%NELM           &
+                     ,Orientation    = .TRUE.                 &
+                     ,TranslationVel = .TRUE.                 &
+                     ,RotationVel    = .TRUE.                 &
+                     ,nScalars       = 2                        &  ! scalar 1 is W, scalar 2 is Alpha
+                     ,ErrStat        = ErrStat2                 &
+                     ,ErrMess        = ErrMess2                 )
+
+     DO IE = 1, p%Element%NELM-1 ! construct the blades into Line2 elements
+       CALL MeshConstructElement ( Mesh = u%InputMarkers(IB)   &
+                                  ,Xelement = ELEMENT_LINE2       &
+                                  ,P1       = IE                  &
+                                  ,P2       = IE+1                &
+                                  ,ErrStat  = ErrStat2            &
+                                  ,ErrMess  = ErrMess             )
+     ENDDO
+
+
+   ENDDO
+
+   IF (.NOT. ALLOCATED(O%Element%W2) ) THEN
+      ALLOCATE(O%Element%W2(p%Element%NELM,NB), STAT=ErrStat)
       IF (ErrStat /= 0 ) THEN
          CALL WrScr( ' Error in AeroDyn allocating memory for W2.')
          RETURN
       END IF
    END IF
 
-   IF (.NOT. ALLOCATED(Alpha) ) THEN
-      ALLOCATE(Alpha(NELM,NB), STAT=ErrStat)
+   IF (.NOT. ALLOCATED(O%Element%Alpha) ) THEN
+      ALLOCATE(O%Element%Alpha(p%Element%NELM,NB), STAT=ErrStat)
       IF (ErrStat /= 0 ) THEN
          CALL WrScr( ' Error in AeroDyn allocating memory for Alpha.')
          RETURN
       END IF
    END IF
-!------
 
-   IF ( ElemPrn )  CALL ElemOpen (TRIM( ADOptions%OutRootName )//'.elm')
+   
+   P%UnWndOut = -1
+   P%UnElem = -1   
+   IF ( p%ElemPrn )  CALL ElemOpen ( TRIM( InitInp%OutRootName )//'.elm', P, O, ErrStat, ErrMess, AD_Ver )
 
    !-------------------------------------------------------------------------------------------------
    ! Calculate the rotor and hub radaii from the input values
    !-------------------------------------------------------------------------------------------------
-   HubRadius = DOT_PRODUCT( TurbineComponents%Blade(1)%Position(:) - TurbineComponents%Hub%Position(:), &
-                            TurbineComponents%Blade(1)%Orientation(3,:) )
-                            
-                            
-      
-   DO IB = 2,NB
-      TmpVar = DOT_PRODUCT( TurbineComponents%Blade(IB)%Position(:) - TurbineComponents%Hub%Position(:), &
-                            TurbineComponents%Blade(IB)%Orientation(3,:) )
+   HubRadius = DOT_PRODUCT( InitInp%TurbineComponents%Blade(1)%Position(:)        &
+                          - InitInp%TurbineComponents%Hub%Position(:),            &
+                            InitInp%TurbineComponents%Blade(1)%Orientation(3,:) )
 
+   DO IB = 2,NB
+      TmpVar    = DOT_PRODUCT( InitInp%TurbineComponents%Blade(IB)%Position(:)    &
+                             - InitInp%TurbineComponents%Hub%Position(:),         &
+                               InitInp%TurbineComponents%Blade(IB)%Orientation(3,:) )
       IF ( ABS( TmpVar - HubRadius ) > 0.001 ) THEN ! within 1 mm
          CALL ProgWarn( ' AeroDyn\AD_Init() calculated HubRadius is not the same for all '// &
                            'blades. Using value from blade 1.' )
-         EXIT                           
+         EXIT
       END IF
    END DO !IB
-   
-   TipRadius = TurbineComponents%BladeLength + HubRadius
-   
-   CosPrecone = ASIN( DOT_PRODUCT( TurbineComponents%Blade(1)%Orientation(3,:), &
-                                   TurbineComponents%Hub%Orientation(1,:) ) )  ! this is the precone angle -- we'll take the COS later
-   
+
+   TipRadius = InitInp%TurbineComponents%BladeLength + HubRadius
+
+   CosPrecone = ASIN( DOT_PRODUCT( InitInp%TurbineComponents%Blade(1)%Orientation(3,:), &
+                                   InitInp%TurbineComponents%Hub%Orientation(1,:) ) )  ! precone angle -- do COS later
+
    DO IB = 2,NB
-      TmpVar  = ASIN( DOT_PRODUCT( TurbineComponents%Blade(IB)%Orientation(3,:), &
-                                   TurbineComponents%Hub%Orientation(1,:) ) )
-      IF ( ABS( TmpVar - CosPrecone ) > 0.009 ) THEN     ! within ~ 1/2 degree ( I won't worry about the discontinuity because we don't want 90 degree precone, anyway. )
+      TmpVar  = ASIN( DOT_PRODUCT( InitInp%TurbineComponents%Blade(IB)%Orientation(3,:), &
+                                   InitInp%TurbineComponents%Hub%Orientation(1,:) ) )
+      IF ( ABS( TmpVar - CosPrecone ) > 0.009 ) THEN     ! within ~ 1/2 degree
          CALL ProgWarn( ' AeroDyn\AD_Init() calculated precone angle is not the same for all'// &
                            ' blades. Using value from blade 1.' )
-         EXIT                           
+         EXIT
       END IF
    END DO !IBld
-   
+
    CosPrecone = COS( CosPrecone )
-     
-   R = TipRadius * CosPrecone
+
+   p%Blade%R = TipRadius * CosPrecone
    RHub = HubRadius * CosPrecone
+   p%HubRad = RHub
 
       ! Check that the AeroDyn input DR and RElm match (use the HubRadius and TipRadius to verify)
       ! before using them to calculate the tip- and hub-loss constants
-   CALL CheckRComp( ADOptions%ADInputFile, HubRadius, TipRadius, ErrStat )
-   IF ( ErrStat /= 0 ) RETURN
+   CALL CheckRComp( P, x, xd, z, O, y, ErrStat, ErrMess, &
+                    InitInp%ADFileName, HubRadius, TipRadius )
+
+   IF ( ErrStat /= ErrID_None ) RETURN
 
    !-------------------------------------------------------------------------------------------------
    ! Calculate tip-loss constants
    !-------------------------------------------------------------------------------------------------
-   DO IElm = 1,NElm  ! Loop through all blade elements
+   DO IElm = 1,p%Element%NElm  ! Loop through all blade elements
 
-      ElemRad = RELM(IElm)*CosPrecone
+      ElemRad = p%Element%RELM(IElm)*CosPrecone
 
       IF( ElemRad == 0.0 )  THEN  !BJJ: should this be 0.001 (or another small number) instead of exactly 0.0?
-!         DTip         = R - 0.5 * DR(IElm)*CosPrecone
-!         TLCNST(IElm) = NB * DTip / DR(IElm)
          CALL WrScr( 'Error calculating tip loss constant for element '//TRIM(Int2LStr(IElm))//'. Division by zero.' )
-         ErrStat = 1
+         ErrStat = ErrID_Fatal
          RETURN
       ELSE
-         DTip         = R - ElemRad
-         TLCNST(IElm) = 0.5 * NB * DTip / ElemRad
+         DTip         = p%Blade%R - ElemRad
+         p%Element%TLCNST(IElm) = 0.5 * NB * DTip / ElemRad
       ENDIF
 
-!      IF ( TLCNST(IElm) < 0.001 )  THEN
-!         TLCNST(IElm) = 0.125*NB*DR(IElm)*CosPrecone/ElemRad      ! Use 25% of DR at tip.  !bjj: is that really the tip?
-!      ENDIF
-
-   ENDDO             ! IELM - all blade elements
+   ENDDO             ! IElm - all blade elements
 
 
    !-------------------------------------------------------------------------------------------------
@@ -265,56 +309,173 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
    !-------------------------------------------------------------------------------------------------
    IF ( RHub > 0.001 )  THEN
 
-      DO Ielm = 1,NELM  ! Loop through all blade elements
+      DO Ielm = 1,p%Element%NELM  ! Loop through all blade elements
 
-         ElemRad = RELM(Ielm)*CosPrecone  ! Use only the precone angle of blade 1 (assumed very similar to other blades)
+         ElemRad = p%Element%RELM(Ielm)*CosPrecone  ! Use only the precone angle of blade 1 (assumed very similar to other blades)
 
          DHub         = ElemRad - RHub
-         HLCNST(Ielm) = 0.5 * NB * DHub / RHub
+         p%Element%HLCNST(Ielm) = 0.5 * NB * DHub / RHub
 
       ENDDO             ! IELM - all blade elements
 
    ELSE
 
-      HLCNST(:) = 0.0
+      p%Element%HLCNST(:) = 0.0
 
    ENDIF
+
+
+
+      !-------------------------------------------------------------------------------------------------
+      ! Interpolate the tower diameter at ElastoDyn's tower nodes if we will be computing tower aerodynamics.
+      !-------------------------------------------------------------------------------------------------
+
+   IF ( p%TwrProps%CalcTwrAero )  THEN
+
+         !-------------------------------------------------------------------------------------------------
+         ! IMPORTANT NOTES:
+         !     o  Supposedly, the glue code will not try to do anything with the tower-aero mesh if is is
+         !        not created, so the creation is inside the test for CalcTwrAero.
+         !     o  The tower properties from AeroDyn's tower file are for heights from the origin (ground or
+         !        MSL) to the hub height--not the top of the tower.
+         !     o  For now, we are allowing only one set of Cd for the entire tower.
+         !     o  InterpIndx is initialize to 1 at compile time.
+         !-------------------------------------------------------------------------------------------------
+
+
+         ! Create the mesh for the tower aerodynamics.
+
+      CALL MeshCreate ( BlankMesh       = u%Twr_InputMarkers      &
+                      , IOS             = COMPONENT_INPUT         &
+                      , NNodes          = InitInp%NumTwrNodes     &
+                      , Orientation     = .TRUE.                  &
+                      , TranslationDisp = .TRUE.                  &
+                      , TranslationVel  = .TRUE.                  &
+                      , ErrStat         = ErrStatLcl              &
+                      , ErrMess         = ErrMessLcl              )
+
+      IF ( ErrStatLcl >= AbortErrLev )  THEN
+         CALL ExitThisRoutine ( ErrStatLcl, ErrMessLcl )
+         RETURN
+      END IF
+
+
+         ! Set the positions of the nodes.  MeshCreate() allocated the Position array.
+
+      u%Twr_InputMarkers%Position(:,:) = InitInp%TwrNodeLocs(:,:)
+      u%Twr_InputMarkers%Nnodes        = InitInp%NumTwrNodes
+
+
+         ! Construct the tower with Line-2 elements.
+
+      DO Elem=1,u%Twr_InputMarkers%Nnodes-1
+
+         CALL MeshConstructElement ( Mesh     = u%Twr_InputMarkers &
+                                   , Xelement = ELEMENT_LINE2      &
+                                   , P1       = Elem               &
+                                   , P2       = Elem+1             &
+                                   , ErrStat  = ErrStatLcl         &
+                                   , ErrMess  = ErrMessLcl         )
+
+         IF ( ErrStatLcl >= AbortErrLev )  THEN
+            CALL ExitThisRoutine ( ErrStatLcl, ErrMessLcl )
+            RETURN
+         END IF
+
+      ENDDO
+
+
+         ! Commit the mesh to the funny farm.
+
+      CALL MeshCommit ( u%Twr_InputMarkers, ErrStatLcl, ErrMessLcl )
+
+      IF ( ErrStatLcl >= AbortErrLev )  THEN
+         CALL ExitThisRoutine ( ErrStatLcl, ErrMessLcl )
+         RETURN
+      END IF
+
+
+         ! Copy the input mesh to create the output mesh.  Does
+
+      CALL MeshCopy ( SrcMesh  = u%Twr_InputMarkers &
+                    , DestMesh = y%Twr_OutputLoads  &
+                    , CtrlCode = MESH_SIBLING       &
+                    , Force    = .TRUE.             &
+                    , ErrStat  = ErrStatLcl         &
+                    , ErrMess  = ErrMessLcl         )
+
+      IF ( ErrStatLcl >= AbortErrLev )  THEN
+         CALL ExitThisRoutine ( ErrStatLcl, ErrMessLcl )
+         RETURN
+      END IF
+
+
+         ! Check to ensure that the user did not specify more than one set of Cd(Re) tables.  Temporary restriction.
+
+      IF ( p%TwrProps%NTwrCD /= 1 )  THEN
+         CALL ExitThisRoutine ( AbortErrLev, NewLine &
+                            //' >> Fatal Error: You must have one and only one set of drag coefficients for the AeroDyn tower file.' )
+         RETURN
+      END IF
+
+
+         ! Build the TwrNodeWidth array.
+
+      p%TwrProps%NumTwrNodes = InitInp%NumTwrNodes
+
+      IF (.NOT. ALLOCATED( p%TwrProps%TwrNodeWidth ) ) THEN
+         CALL AllocAry( p%TwrProps%TwrNodeWidth, p%TwrProps%NumTwrNodes, "array for tower widths at ED node locations", ErrStatLcl, ErrMessLcl )
+         IF ( ErrStatLcl >= AbortErrLev )  THEN
+            CALL ExitThisRoutine ( ErrStatLcl, ErrMessLcl )
+            RETURN
+         END IF
+      END IF
+
+      DO Node=1,p%TwrProps%NumTwrNodes
+
+         TwrNodeHt = InitInp%TwrNodeLocs(3,Node)/p%Rotor%HH
+
+         p%TwrProps%TwrNodeWidth(Node) = InterpStp( TwrNodeHt, p%TwrProps%TwrHtFr, p%TwrProps%TwrWid, InterpIndx, p%TwrProps%NTwrHT )
+
+      END DO ! Node
+
+   END IF ! ( p%TwrProps%CalcTwrAero )
+
 
    !-------------------------------------------------------------------------------------------------
    ! Write the opt file, then close it
    !-------------------------------------------------------------------------------------------------
 
-   IF (WrOptFile) THEN
-      CALL OpenFOutFile( UnADopt, TRIM(ADOptions%OutRootName)//'.opt', ErrStat)
-      IF (ErrStat /= 0 ) RETURN
+   IF (p%WrOptFile) THEN
+      !CALL GetNewUnit( p%UnADopt, ErrStat, ErrMess )
+      CALL OpenFOutFile( p%UnADopt, TRIM(InitInp%OutRootName)//'.opt', ErrStat)
+      IF (ErrStat /= ErrID_None ) RETURN
 
-      WRITE (UnADopt,"(/'This file was generated by ', A , ' on ', A, ' at ', A , '.')")  &
-                     TRIM(GetNVD(AD_Prog)), CurDate(), CurTime()
+      WRITE (p%UnADopt,"(/A)")  'This file was generated by '//TRIM(GetNVD(AD_Ver))//&
+                                ' on '//CurDate()//' at '//CurTime()//'.'
 
-      CALL ADOut( TITLE, RHub, InitWindInfl%WindFileName )
+      CALL ADOut(InitInp, P, O, ErrStat, ErrMess )
 
-      CLOSE(UnADopt)
+      CLOSE(p%UnADopt)
    ENDIF
-
-!bjj: perhaps this should be in a summary/echo file (combine WrOptFile and WrEchoFile)
-!
-!   IF (WrOptFile) THEN
-!      CALL ADOut( TITLE )
-!
-!      CALL CloseEcho()
-!   ENDIF
 
 
    !-------------------------------------------------------------------------------------------------
    ! Initialize the wind inflow module
    !-------------------------------------------------------------------------------------------------
-   InitWindInfl%WindFileType    = DEFAULT_Wind  ! determine the type from the file name; replace with new input later
-   InitWindInfl%ReferenceHeight = HH            ! HH is read from the AeroDyn input file
-   InitWindInfl%Width           = 2 * R
 
-   CALL WindInf_Init( InitWindInfl, ErrStat )
-   IF (ErrStat /= 0) RETURN
+   InitInp%IfW_InitInputs%WindFileName = p%WindFileName
+   InitInp%IfW_InitInputs%ReferenceHeight = p%Rotor%HH
+   InitInp%IfW_InitInputs%Width = 2 * p%Blade%R
+   InitInp%IfW_InitInputs%WindFileType = DEFAULT_WindNumber
 
+
+   CALL IfW_Init( InitInp%IfW_InitInputs,   u%IfW_Inputs,    p%IfW_Params,                          &
+                     x%IfW_ContStates, xd%IfW_DiscStates,   z%IfW_ConstrStates,    O%IfW_OtherStates,   &
+                     y%IfW_Outputs,    Interval,  InitOut%IfW_InitOutput,   ErrStat,    ErrMess )
+
+
+   IF (ErrStat /= ErrID_None) RETURN
 
    !-------------------------------------------------------------------------------------------------
    ! Turn off dynamic inflow for wind less than 8 m/s (per DJL: 8 m/s is really just an empirical guess)
@@ -322,183 +483,290 @@ FUNCTION AD_Init(ADOptions, TurbineComponents, ErrStat)
    ! BJJ: FIX THIS!!!!
    !-------------------------------------------------------------------------------------------------
 
-   IF (DynInfl) THEN
+   IF (p%DynInfl) THEN
 
-      MeanWind = WindInf_ADhack_DIcheck( ErrStat )
-
-      IF (ErrStat /=0) THEN
-         CALL ProgWarn( ' Error getting mean velocity in AeroDyn/AD_Init(). '// &
-                          'Dynamic inflow will not check for low mean wind speed.' )
-         ErrStat = 0
-      ELSE IF ( MeanWind < 8.0 ) THEN
-         DynInfl = .FALSE.
-         CALL ProgWarn( ' Estimated average wind speed in wind file is less than 8 m/s. Dynamic Inflow will be turned off.' )
+      IF ( p%IfW_Params%WindFileType /= FF_WINDNumber ) THEN
+         ErrStat = ErrID_Info
+         ErrMess = ' Dynamic inflow will not check for low mean wind speed.'
+      ELSE IF ( O%IfW_OtherStates%FFWind%MeanFFWS  < 8.0 ) THEN
+         p%DynInfl = .FALSE.
+         ErrStat = ErrID_Info
+         ErrMess = ' Estimated average wind speed in FF wind file is less than 8 m/s. Dynamic Inflow will be turned off.'
       END IF
 
    ENDIF
 
 
-   !-------------------------------------------------------------------------------------------------
-   ! Allocate variable to store current loads return values here
-   !-------------------------------------------------------------------------------------------------
-   IF (.NOT. ALLOCATED( ADCurrentLoads%Blade ) ) THEN
-      ALLOCATE ( ADCurrentLoads%Blade(NElm, NB), STAT=ErrStat )
-      IF ( ErrStat /= 0 ) THEN
-         CALL WrScr( ' Error allocating memory for ADCurrentLoads.')
-         RETURN
-      END IF
-   END IF
-
-
-   !-------------------------------------------------------------------------------------------------
-   ! Set the AD_Init return values here
-   !-------------------------------------------------------------------------------------------------
-   IF (.NOT. ALLOCATED( AD_Init%Blade ) ) THEN
-      ALLOCATE ( AD_Init%Blade(NElm, NB), STAT=ErrStat )
-      IF ( ErrStat /= 0 ) THEN
-         CALL WrScr( ' Error allocating memory for AD_Init%Blade elements.')
-         RETURN
-      END IF
-   END IF
 
       ! RELATIVE POSITION OF BLADE ELEMENTS
 
-   AD_Init%Blade(:,:)%Position(1) = 0.0
-   AD_Init%Blade(:,:)%Position(2) = 0.0
+     u%TurbineComponents%Hub%Position          =   InitInp%TurbineComponents%Hub%Position
+     u%TurbineComponents%Hub%Orientation       =   InitInp%TurbineComponents%Hub%Orientation
+     u%TurbineComponents%RotorFurl%Position    =   InitInp%TurbineComponents%RotorFurl%Position
+     u%TurbineComponents%RotorFurl%Orientation =   InitInp%TurbineComponents%RotorFurl%Orientation
+     u%TurbineComponents%Nacelle%Position      =   InitInp%TurbineComponents%Nacelle%Position
+     u%TurbineComponents%Nacelle%Orientation   =   InitInp%TurbineComponents%Nacelle%Orientation
+     u%TurbineComponents%TailFin%Position      =   InitInp%TurbineComponents%TailFin%Position
+     u%TurbineComponents%TailFin%Orientation   =   InitInp%TurbineComponents%TailFin%Orientation
+     u%TurbineComponents%Tower%Position        =   InitInp%TurbineComponents%Tower%Position
+     u%TurbineComponents%Tower%Orientation     =   InitInp%TurbineComponents%Tower%Orientation
 
-   DO IB = 1, NB
-      AD_Init%Blade(:,IB)%Position(3) = RElm(:) - HubRadius
-   END DO
+     DO IB = 1, NB
 
-      ! RELATIVE ORIENTATION OF BLADE ELEMENTS
+       u%TurbineComponents%Blade(IB)%Position    =   InitInp%TurbineComponents%Blade(IB)%Position
+       u%TurbineComponents%Blade(IB)%Orientation =   InitInp%TurbineComponents%Blade(IB)%Orientation
 
-   DO IB = 1,NB
-      AD_Init%Blade(:,IB)%Orientation(1,1) = COS( TWIST(:) )
-      AD_Init%Blade(:,IB)%Orientation(2,1) = SIN( TWIST(:) )
-      AD_Init%Blade(:,IB)%Orientation(3,1) = 0.0
+       DO IE = 1, p%Element%NELM
+         TmpPos(1) = 0.
+         TmpPos(2) = 0.
+         TmpPos(3) = p%Element%Relm(IE) - HubRadius
+         CALL MeshPositionNode ( Mesh = u%InputMarkers(IB)           &
+                                ,INode = IE                             &
+                                ,Pos= TmpPos                            &  ! this info comes from FAST (not yet)
+                                ,ErrStat   = ErrStat2                   &
+                                ,ErrMess   = ErrMess2                )
 
-      AD_Init%Blade(:,IB)%Orientation(1,2) =                 -1.*AD_Init%Blade(:,IB)%Orientation(2,1)
-      AD_Init%Blade(:,IB)%Orientation(2,2) =                     AD_Init%Blade(:,IB)%Orientation(1,1)
-      AD_Init%Blade(:,IB)%Orientation(3,2) =                  0.0
+        ! RELATIVE ORIENTATION OF BLADE ELEMENTS
+         u%InputMarkers(IB)%Orientation(1,1,IE) = COS( P%Element%TWIST(IE) )
+         u%InputMarkers(IB)%Orientation(2,1,IE) = SIN( P%Element%TWIST(IE) )
+         u%InputMarkers(IB)%Orientation(3,1,IE) = SIN( P%Element%TWIST(IE) )
+         u%InputMarkers(IB)%Orientation(1,2,IE) = -1. * u%InputMarkers(IB)%Orientation(2,1,IE)
+         u%InputMarkers(IB)%Orientation(2,2,IE) =       u%InputMarkers(IB)%Orientation(1,1,IE)
+         u%InputMarkers(IB)%Orientation(3,2,IE) = 0.0
+         u%InputMarkers(IB)%Orientation(1,3,IE) = 0.0
+         u%InputMarkers(IB)%Orientation(2,3,IE) = 0.0
+         u%InputMarkers(IB)%Orientation(3,3,IE) = 1.0
+       ENDDO
+       CALL MeshCommit ( Mesh = u%InputMarkers(IB)   &
+                        ,ErrStat  = ErrStat2            &
+                        ,ErrMess   = ErrMess2             )
+       CALL MeshCopy ( SrcMesh  = u%InputMarkers(IB)  &
+                      ,DestMesh = y%OutputLoads(IB)     &
+                      ,CtrlCode = MESH_SIBLING           &
+                      ,Force    = .TRUE.                 &
+                      ,Moment   = .TRUE.                 &
+                      ,ErrStat  = ErrStat2               &
+                      ,ErrMess  = ErrMess2                )
+       IF ( .NOT. ALLOCATED( o%StoredForces ))   ALLOCATE(o%StoredForces(3,p%Element%NELM,NB))
+       IF ( .NOT. ALLOCATED( o%StoredMoments ))  ALLOCATE(o%StoredMoments(3,p%Element%NELM,NB))
 
-      AD_Init%Blade(:,IB)%Orientation(1,3) =                                                                 0.0
-      AD_Init%Blade(:,IB)%Orientation(2,3) =                                                                 0.0
-      AD_Init%Blade(:,IB)%Orientation(3,3) =                                                                 1.0
-   END DO
-
-
-
-!   ALLOCATE ( AD_Init%Hub(1),          STAT=ErrStat )
-!   IF ( ErrStat /= 0 ) THEN
-!      CALL WrScr( ' Error allocating memory for AD_Init%Hub.')
-!      RETURN
-!   END IF
-!
-!   ALLOCATE ( AD_Init%Nacelle(1),      STAT=ErrStat )
-!   IF ( ErrStat /= 0 ) THEN
-!      CALL WrScr( ' Error allocating memory for AD_Init%Nacelle.')
-!      RETURN
-!   END IF
-!
-!   ALLOCATE ( AD_Init%Tower(1),        STAT=ErrStat )
-!   IF ( ErrStat /= 0 ) THEN
-!      CALL WrScr( ' Error allocating memory for AD_Init%Tower.')
-!      RETURN
-!   END IF
-!
-!   ALLOCATE ( AD_Init%Tail(1),         STAT=ErrStat )
-!   IF ( ErrStat /= 0 ) THEN
-!      CALL WrScr( ' Error allocating memory for AD_Init%Tail.')
-!      RETURN
-!   END IF
+     ENDDO
 
 
 !bjj start of plotting info:
-   IF ( OutputPlottingInfo ) THEN
-   
-      CALL OpenFOutFile( UNADPlt, TRIM(ADOptions%OutRootName)//'_plotInfo.txt' )
-      WRITE( UNADPlt, '(A,1X,F20.5)' ) 'HubRadius',   HubRadius
-      WRITE( UNADPlt, '(A,1X,F20.5)' ) 'TipRadius',   TipRadius
-      WRITE( UNADPlt, '(A,1X,F20.5)' ) 'BladeLength', TurbineComponents%BladeLength
-      WRITE( UNADPlt, '(A,1X,I2)'    ) 'NumBlades',   NB
-      WRITE( UNADPlt, '(A,1X,I2)'    ) 'NumElements', NElm
-      
-      WRITE( UNADPlt, '("AeroConfig:")' )
+   IF ( p%OutputPlottingInfo ) THEN
+
+      CALL OpenFOutFile( p%UnADPlt, TRIM(InitInp%OutRootName)//'_plotInfo.txt' )
+      WRITE( p%UnADPlt, '(A,1X,F20.5)' ) 'HubRadius',   HubRadius
+      WRITE( p%UnADPlt, '(A,1X,F20.5)' ) 'TipRadius',   TipRadius
+      WRITE( p%UnADPlt, '(A,1X,F20.5)' ) 'BladeLength', InitInp%TurbineComponents%BladeLength
+      WRITE( p%UnADPlt, '(A,1X,I2)'    ) 'NumBlades',   NB
+      WRITE( p%UnADPlt, '(A,1X,I2)'    ) 'NumElements', p%Element%NElm
+
+      WRITE( p%UnADPlt, '("AeroConfig:")' )
       DO IB=1,NB
-         WRITE( UNADPlt, '(A,I1,A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-             'Blade',IB,'_Position      ', TurbineComponents%Blade(IB)%Position(:), TurbineComponents%Blade(IB)%Orientation(:,:)
+         WRITE( p%UnADPlt, '(A,I1,A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+             'Blade',IB,'_Position      ', InitInp%TurbineComponents%Blade(IB)%Position(:), InitInp%TurbineComponents%Blade(IB)%Orientation(:,:)
       END DO
-      
-      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-               'Hub_Position         ', TurbineComponents%Hub%Position(:),TurbineComponents%Hub%Orientation(:,:)
-      
-      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-               'RotorFurl_Position   ', TurbineComponents%RotorFurl%Position(:),TurbineComponents%RotorFurl%Orientation(:,:)
 
-      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-               'Nacelle_Position     ', TurbineComponents%Nacelle%Position(:),TurbineComponents%Nacelle%Orientation(:,:)
+      WRITE( p%UnADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+        'Hub_Position         ',InitInp%TurbineComponents%Hub%Position(:),InitInp%TurbineComponents%Hub%Orientation(:,:)
 
-      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-               'TailFin_Position     ', TurbineComponents%TailFin%Position(:), TurbineComponents%TailFin%Orientation(:,:)
+      WRITE( p%UnADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+        'RotorFurl_Position   ',InitInp%TurbineComponents%RotorFurl%Position(:),InitInp%TurbineComponents%RotorFurl%Orientation(:,:)
 
-      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-               'Tower_Position       ', TurbineComponents%Tower%Position(:),TurbineComponents%Tower%Orientation(:,:)
+      WRITE( p%UnADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+        'Nacelle_Position     ',InitInp%TurbineComponents%Nacelle%Position(:),InitInp%TurbineComponents%Nacelle%Orientation(:,:)
 
+      WRITE( p%UnADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+        'TailFin_Position     ',InitInp%TurbineComponents%TailFin%Position(:), InitInp%TurbineComponents%TailFin%Orientation(:,:)
 
-   END IF      
+      WRITE( p%UnADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+        'Tower_Position       ',InitInp%TurbineComponents%Tower%Position(:),InitInp%TurbineComponents%Tower%Orientation(:,:)
+
+   END IF
 !bjj end of plotting info:
 
    !-------------------------------------------------------------------------------------------------
    ! Initialize AeroDyn variables not initialized elsewhere (except in module initialization)
    ! and return
    !-------------------------------------------------------------------------------------------------
-   SumInfl     = 0.0
-   AvgInfl     = 0.0
-   Time        = 0.0
-   OldTime     = 0.0
-   
-   TwoPiNB     = TwoPi / REAL( NB, ReKi )
+   o%InducedVel%SumInfl     = 0.0
+   o%Rotor%AvgInfl     = 0.0
+   o%Time        = 0.0
+   o%OldTime     = 0.0
 
-   Initialized = .TRUE.
-   NoLoadsCalculated = .TRUE.
+   p%TwoPiNB     = TwoPi / REAL( NB, ReKi )
+
+   p%Initialized = .TRUE.
+   o%NoLoadsCalculated = .TRUE.
+   
+   
+   DO ie = 1, maxInfl
+      p%DynInflow%xMinv(ie) = PIBY2 / hfunc(MRvector(ie), NJvector(ie))   !bjj: this is really just a parameter, too.
+   END DO !ie   
+
    RETURN
 
-
-END FUNCTION AD_Init
-
-!====================================================================================================
-FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, CurrentADOptions, ErrStat )
-! The main AeroDyn procedure, it calculates loads of the elements given by InputMarkers
-!----------------------------------------------------------------------------------------------------
-
-   USE                           AeroTime !,   ONLY: Time, OldTime, DT, DTAero
-   USE                           Airfoil,    ONLY: MulTabLoc
-   USE                           AeroSubs
-   USE                           Blade,      ONLY: R, NB, DR
-   USE                           Element,    ONLY: PitNow, NElm, Twist
-   USE                           ElOutParams,ONLY: SaveVX, SaveVY, SaveVZ, VXSAV, VYSAV, VZSAV, WndElPrList
-   USE                           InducedVel, ONLY: SumInfl
-   USE                           Rotor,      ONLY: Tilt, YawAng, YawVel, Revs, AvgInfl, CTilt, CYaw, STilt, SYaw
-   USE                           Switch,     ONLY: DStall, Wake, DynInfl, DynInit, ElemPrn
+   !=======================================================================
+   CONTAINS
+   !=======================================================================
+   SUBROUTINE ExitThisRoutine ( ErrID, Msg )
 
 
-      ! Passed parameters
+      ! This subroutine cleans up the parent routine before exiting.
 
-   REAL( ReKi ),           INTENT(IN)  :: CurrentTime             ! Current simulation time
-   TYPE( AllAeroMarkers ), INTENT(IN)  :: InputMarkers            ! The input state of all aerodynamic markers
-   TYPE( AeroLoadsOptions),INTENT(IN)  :: CurrentADOptions
-   TYPE( AeroConfig ),     INTENT(IN)  :: TurbineComponents       ! The markers defining the current location of the turbine
-   INTEGER,                INTENT(OUT) :: ErrStat                 ! Determines if an error was encountered
-  
-      ! Function definition
 
-   TYPE( AllAeroLoads )                :: AD_CalculateLoads       ! the aerodynamic loads calculated at the input marker locations
+         ! Argument declarations.
+
+      INTEGER(IntKi), INTENT(IN)                :: ErrID                      ! The error identifier (ErrStat)
+
+      CHARACTER(*),   INTENT(IN)                :: Msg                        ! The error message (ErrMess)
+
+
+
+         ! Set error status/message
+
+      ErrStat = ErrID
+      ErrMess = Msg
+
+
+      RETURN
+
+   END SUBROUTINE ExitThisRoutine ! ( ErrID, Msg )
+
+
+END SUBROUTINE AD_Init
+
+!----------------------------------------------------------------------------------------------------------------------------------
+SUBROUTINE AD_End( u, p, x, xd, z, OtherState, y, ErrStat, ErrMess )
+! This routine is called at the end of the simulation.
+!..................................................................................................................................
+
+      TYPE(AD_InputType),           INTENT(INOUT)  :: u           ! System inputs
+      TYPE(AD_ParameterType),       INTENT(INOUT)  :: p           ! Parameters
+      TYPE(AD_ContinuousStateType), INTENT(INOUT)  :: x           ! Continuous states
+      TYPE(AD_DiscreteStateType),   INTENT(INOUT)  :: xd          ! Discrete states
+      TYPE(AD_ConstraintStateType), INTENT(INOUT)  :: z           ! Constraint states
+      TYPE(AD_OtherStateType),      INTENT(INOUT)  :: OtherState  ! Other/optimization states
+      TYPE(AD_OutputType),          INTENT(INOUT)  :: y           ! System outputs
+      INTEGER(IntKi),                    INTENT(  OUT)  :: ErrStat     ! Error status of the operation
+      CHARACTER(*),                      INTENT(  OUT)  :: ErrMess      ! Error message if ErrStat /= ErrID_None
+
+
+
+         ! Initialize ErrStat
+
+      ErrStat = ErrID_None
+      ErrMess  = ""
+
+
+         ! Place any last minute operations or calculations here:
+
+      CALL IfW_End(  u%IfW_Inputs, p%IfW_Params, x%IfW_ContStates, xd%IfW_DiscStates, z%IfW_ConstrStates, &
+                     OtherState%IfW_OtherStates, y%IfW_Outputs, ErrStat, ErrMess )
+
+         ! Close files here:
+
+      ! AD_IOParams
+   IF (P%UnADin > 0)  CLOSE(P%UnADin)              ! ipt file
+   IF (P%UnADopt > 0) CLOSE(P%UnADopt)             ! opt file
+   IF (P%UnAirfl > 0) CLOSE(P%UnAirfl)             ! Airfoil data file
+   IF (P%UnWind > 0)  CLOSE(P%UnWind)              ! HH or FF wind file
+   IF (P%UnEc > 0)    CLOSE(P%UnEc)
+
+   IF (P%UnWndOut > 0) CLOSE(P%UnWndOut)
+   IF (P%UnADPlt > 0)  CLOSE(P%UnADPlt)
+
+
+         ! Destroy the input data:
+
+      CALL AD_DestroyInput( u, ErrStat, ErrMess )
+
+
+         ! Destroy the parameter data:
+
+      CALL AD_DestroyParam( p, ErrStat, ErrMess )
+
+
+         ! Destroy the state data:
+
+      CALL AD_DestroyContState(   x,           ErrStat, ErrMess )
+      CALL AD_DestroyDiscState(   xd,          ErrStat, ErrMess )
+      CALL AD_DestroyConstrState( z,           ErrStat, ErrMess )
+      CALL AD_DestroyOtherState(  OtherState,  ErrStat, ErrMess )
+
+
+         ! Destroy the output data:
+
+      CALL AD_DestroyOutput( y, ErrStat, ErrMess )
+
+
+
+
+END SUBROUTINE AD_End
+!----------------------------------------------------------------------------------------------------------------------------------
+SUBROUTINE AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, ErrStat, ErrMess )
+! Loose coupling routine for solving for constraint states, integrating continuous states, and updating discrete states
+! Constraint states are solved for input Time; Continuous and discrete states are updated for Time + Interval
+!..................................................................................................................................
+
+      REAL(DbKi),                         INTENT(IN   ) :: t           ! Current simulation time in seconds
+      INTEGER(IntKi),                     INTENT(IN   ) :: n           ! Current simulation time step n = 0,1,...
+      TYPE(AD_InputType),                 INTENT(INOUT) :: u(:)        ! Inputs at utimes (out only for mesh record-keeping in ExtrapInterp routine)
+      REAL(DbKi),                         INTENT(IN   ) :: utimes(:)   ! Times associated with u(:), in seconds
+      TYPE(AD_ParameterType),             INTENT(IN   ) :: p           ! Parameters
+      TYPE(AD_ContinuousStateType),       INTENT(INOUT) :: x           ! Input: Continuous states at t;
+                                                                       !   Output: Continuous states at t + Interval
+      TYPE(AD_DiscreteStateType),         INTENT(INOUT) :: xd          ! Input: Discrete states at t;
+                                                                       !   Output: Discrete states at t  + Interval
+      TYPE(AD_ConstraintStateType),       INTENT(INOUT) :: z           ! Input: Initial guess of constraint states at t;
+                                                                       !   Output: Constraint states at t
+      TYPE(AD_OtherStateType),            INTENT(INOUT) :: OtherState  ! Other/optimization states
+      INTEGER(IntKi),                     INTENT(  OUT) :: ErrStat     ! Error status of the operation
+      CHARACTER(*),                       INTENT(  OUT) :: ErrMess     ! Error message if ErrStat /= ErrID_None
+
+         ! Local variables
+
+      TYPE(AD_ContinuousStateType)                 :: dxdt        ! Continuous state derivatives at Time
+      TYPE(AD_ConstraintStateType)                 :: z_Residual  ! Residual of the constraint state equations (Z)
+
+      INTEGER(IntKi)                                    :: ErrStat2    ! Error status of the operation (occurs after initial error)
+      CHARACTER(LEN(ErrMess))                            :: ErrMess2     ! Error message if ErrStat2 /= ErrID_None
+
+         ! Initialize ErrStat
+
+      ErrStat = ErrID_None
+      ErrMess  = ""
+
+
+
+
+
+END SUBROUTINE AD_UpdateStates
+!----------------------------------------------------------------------------------------------------------------------------------
+SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
+! Routine for computing outputs, used in both loose and tight coupling.
+!..................................................................................................................................
    
+      USE               AeroGenSubs,   ONLY: ElemOut
 
+      REAL(DbKi),                   INTENT(IN   )  :: Time        ! Current simulation time in seconds
+      TYPE(AD_InputType),           INTENT(IN   )  :: u           ! Inputs at Time
+      TYPE(AD_ParameterType),       INTENT(IN   )  :: p           ! Parameters
+      TYPE(AD_ContinuousStateType), INTENT(IN   )  :: x           ! Continuous states at Time
+      TYPE(AD_DiscreteStateType),   INTENT(IN   )  :: xd          ! Discrete states at Time
+      TYPE(AD_ConstraintStateType), INTENT(IN   )  :: z           ! Constraint states at Time
+      TYPE(AD_OtherStateType),      INTENT(INOUT)  :: O!therState ! Other/optimization states
+      TYPE(AD_OutputType),          INTENT(INOUT)  :: y           ! Outputs computed at Time (Input only so that mesh con-
+                                                                       !   nectivity information does not have to be recalculated)
+      INTEGER(IntKi),                    INTENT(  OUT)  :: ErrStat     ! Error status of the operation
+      CHARACTER(*),                      INTENT(  OUT)  :: ErrMess      ! Error message if ErrStat /= ErrID_None
 
 
       ! Local variables
-   REAL(ReKi), PARAMETER      :: OnePlusEpsilon = 1 + EPSILON(CurrentTime)
+   REAL(DbKi)                 :: CurrentTime, DT
+   REAL(DbKi), PARAMETER      :: OnePlusEpsilon = 1 + EPSILON(Time)
 
    REAL(ReKi)                 :: VNElement
    REAL(ReKi)                 :: VelNormalToRotor2
@@ -518,500 +786,520 @@ FUNCTION AD_CalculateLoads( CurrentTime, InputMarkers, TurbineComponents, Curren
    REAL(ReKi)                 :: rLocal
    REAL(ReKi)                 :: rRotorFurlHub (2)
    REAL(ReKi)                 :: rTowerBaseHub (2)
-   
+
    REAL(ReKi)                 :: tmpVector     (3)
    REAL(ReKi)                 :: VelocityVec   (3)
 
+   INTEGER                                   :: ErrStatLcL        ! Error status returned by called routines.
    INTEGER                    :: IBlade
    INTEGER                    :: IElement
+   INTEGER                    :: Node                          ! Node index for computing tower aerodynamics.
+
+   CHARACTER(1024)                           :: ErrMessLcl                    ! Error message returned by called routines.
+
+   TYPE(IfW_InputType)        :: IfW_Inputs  ! Position in IfW format.
+
+
+   ! Initialize ErrStat
+      ErrStat = ErrID_None
+      ErrMess  = ""
+      ErrStatLcL = ErrID_None
+      ErrMessLcl = '<none>'
 
    !-------------------------------------------------------------------------------------------------
    ! Check that the module has been initialized.
    !-------------------------------------------------------------------------------------------------
-   IF ( .NOT. Initialized ) THEN
-      CALL WrScr( 'AeroDyn must be initialized before trying to calculate aerodynamic loads.' )
-      ErrStat = 1
+   IF ( .NOT. p%Initialized ) THEN
+      ErrStat = ErrID_Fatal
+      ErrMess = 'AeroDyn must be initialized before trying to calculate aerodynamic loads.'
       RETURN
    ELSE
-      ErrStat = 0
+      ErrStat = ErrID_None
    END IF
 
 
    !-------------------------------------------------------------------------------------------------
    ! Determine if loads should be recalculated or just returned
    !-------------------------------------------------------------------------------------------------
-      ! NOTE: CurrentTime is scaled by OnePlusEps to ensure that loads are calculated at every
+      ! NOTE: Time is scaled by OnePlusEps to ensure that loads are calculated at every
    !       time step when DTAero = DT, even in the presence of numerical precision errors.
 
-
-   IF ( NoLoadsCalculated .OR. ( CurrentTime*OnePlusEpsilon - OldTime ) >= DTAERO )  THEN
+   IF ( o%NoLoadsCalculated .OR. ( Time*OnePlusEpsilon - o%OldTime ) >= p%DTAERO )  THEN
          ! It's time to update the aero forces
 
          ! First we reset the DTAERO parameters for next time
-      DT      = CurrentTime - OldTime     !bjj: DT = 0 on first step, but the subroutines that use DT check for NoLoadsCalculated (or time > 0)
-      OldTime = CurrentTime
+      o%DT      = Time - o%OldTime     !bjj: DT = 0 on first step,
+                                       !but the subroutines that use DT check for NoLoadsCalculated (or time > 0)
+      o%Time = Time  ! used inside aerodyn
+      o%OldTime = Time
 
-   ELSE IF ( .NOT. CurrentADOptions%LinearizeFlag ) THEN
+   ELSE IF ( .NOT. p%LinearizeFlag ) THEN
 
          ! Return the previously-calculated loads
 
 !      CurrentOutputs = ADCurrentLoads
+
+      DO IBlade=1,p%Blade%NB
+       DO IElement=1,p%Element%Nelm
+         y%OutputLoads(IBlade)%Force(:,IElement)  = o%StoredForces(:,IElement,IBlade)
+         y%OutputLoads(IBlade)%Moment(:,IElement) = o%StoredMoments(:,IElement,IBlade)
+       ENDDO
+      ENDDO
+
+      IF ( O%FirstWarn ) THEN
+         ErrStat = ErrID_Warn
+         ErrMESS  = ' AeroDyn was designed for an explicit-loose coupling scheme. '//&
+            'Using last calculated values from AeroDyn on all subsequent calls until time is advanced. '//&
+            'Warning will not be displayed again.' 
+         O%FirstWarn = .FALSE.         
+      END IF
       
-      AD_CalculateLoads = ADCurrentLoads
+      
       RETURN
 
    ENDIF
 
 
 !BJJ start of plotting info
-   IF ( OutputPlottingInfo ) THEN
-   
-      WRITE( UNADPlt, '("AeroConfig: Time =",F20.5)' ) CurrentTime
-      DO IBlade=1,NB
-         WRITE( UNADPlt, '(A,I1,A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-             'Blade',IBlade,'_Position      ', TurbineComponents%Blade(IBlade)%Position(:), &
-                                               TurbineComponents%Blade(IBlade)%Orientation(:,:)
+
+      ! This is debugging output, so it's OK to abort afterwards.
+
+   IF ( p%OutputPlottingInfo ) THEN
+
+      WRITE( p%UNADPlt, '("AeroConfig: Time =",F20.5)' ) Time
+      DO IBlade=1,p%Blade%NB
+         WRITE( p%UNADPlt, '(A,I1,A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+             'Blade',IBlade,'_Position      ', u%TurbineComponents%Blade(IBlade)%Position(:), &
+                                               u%TurbineComponents%Blade(IBlade)%Orientation(:,:)
       END DO
-      
-      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-               'Hub_Position         ', TurbineComponents%Hub%Position(:),TurbineComponents%Hub%Orientation(:,:)
-      
-      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-               'RotorFurl_Position   ', TurbineComponents%RotorFurl%Position(:),TurbineComponents%RotorFurl%Orientation(:,:)
 
-      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-               'Nacelle_Position     ', TurbineComponents%Nacelle%Position(:),TurbineComponents%Nacelle%Orientation(:,:)
+      WRITE( p%UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'Hub_Position         ', u%TurbineComponents%Hub%Position(:),u%TurbineComponents%Hub%Orientation(:,:)
 
-      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-               'TailFin_Position     ', TurbineComponents%TailFin%Position(:), TurbineComponents%TailFin%Orientation(:,:)
+      WRITE( p%UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'RotorFurl_Position   ', u%TurbineComponents%RotorFurl%Position(:),u%TurbineComponents%RotorFurl%Orientation(:,:)
 
-      WRITE( UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-               'Tower_Position       ', TurbineComponents%Tower%Position(:),TurbineComponents%Tower%Orientation(:,:)
+      WRITE( p%UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'Nacelle_Position     ', u%TurbineComponents%Nacelle%Position(:),u%TurbineComponents%Nacelle%Orientation(:,:)
 
-      
-      WRITE( UNADPlt, '("AllAeroMarkers:")' )
-      DO IBlade=1,NB
-         DO IElement = 1,NElm
-            WRITE( UNADPlt, '(A,I1,A,I1,A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
-              'Blade',IBlade,'_Elm',IElement,'_Position', InputMarkers%Blade(IElement,IBlade)%Position(:), &
-                                                          InputMarkers%Blade(IElement,IBlade)%Orientation(:,:)
+      WRITE( p%UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'TailFin_Position     ', u%TurbineComponents%TailFin%Position(:), u%TurbineComponents%TailFin%Orientation(:,:)
+
+      WRITE( p%UNADPlt, '(A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+               'Tower_Position       ', u%TurbineComponents%Tower%Position(:),u%TurbineComponents%Tower%Orientation(:,:)
+
+
+      WRITE( p%UNADPlt, '("AllAeroMarkers:")' )
+      DO IBlade=1,p%Blade%NB
+         DO IElement = 1,p%Element%NElm
+            WRITE( p%UNADPlt, '(A,I1,A,I1,A,3(1X,F20.5)," Orientation",9(1X,F20.5))' ) &
+              'Blade',IBlade,'_Elm',IElement,'_Position', u%InputMarkers(IBlade)%Position(:,IElement),    &
+                                                          u%InputMarkers(IBlade)%Orientation(:,:,IElement)
          END DO
       END DO
-   
-   
-      CLOSE( UNADPlt )
-      CALL ProgAbort(' Closing program due to plot output file.')
+
+
+      CLOSE( p%UNADPlt )
+      CALL ProgAbort(' Closing program due to plot output file.  This is only for debugging.')
    END IF
 !BJJ end of plotting info
 
    !-------------------------------------------------------------------------------------------------
    ! Calculate the forces and moments for the blade: SUBROUTINE AeroFrcIntrface( FirstLoop, JElemt, DFN, DFT, PMA )
    !-------------------------------------------------------------------------------------------------
-   Time      = CurrentTime
+   o%Time      = Time
 
       ! calculate rotor speed
       ! note: Subtracting the RotorFurl rotational velocity for REVS is needed to get the
       ! same answers as before v13.00.00. RotorFurl shouldn't be needed.
-      
-   REVS      = ABS( DOT_PRODUCT( TurbineComponents%Hub%RotationVel(:) - TurbineComponents%RotorFurl%RotationVel(:), &
-                                 TurbineComponents%Hub%Orientation(1,:) ) )
+
+   o%Rotor%REVS = ABS( DOT_PRODUCT( u%TurbineComponents%Hub%RotationVel(:) - u%TurbineComponents%RotorFurl%RotationVel(:), &
+                                    u%TurbineComponents%Hub%Orientation(1,:) ) )
 
 
       ! calculate yaw angle
       ! note: YawAng should use the Hub instead of the RotorFurl, but it is calculated this way to
       ! get the same answers as previous version.
-   YawAng    = ATAN2( -1.*TurbineComponents%RotorFurl%Orientation(1,2), TurbineComponents%RotorFurl%Orientation(1,1) ) 
-   SYaw      = SIN( YawAng )
-   CYaw      = COS( YawAng )
+   o%Rotor%YawAng = ATAN2( -1.*u%TurbineComponents%RotorFurl%Orientation(1,2), u%TurbineComponents%RotorFurl%Orientation(1,1) )
+   o%Rotor%SYaw   = SIN( o%Rotor%YawAng )
+   o%Rotor%CYaw   = COS( o%Rotor%YawAng )
 
       ! tilt angle
       ! note: tilt angle should use the Hub instead of RotorFurl, but it needs hub to get the same
       ! answers as the version before v13.00.00
-      
-   Tilt      = ATAN2( TurbineComponents%RotorFurl%Orientation(1,3), &
-                SQRT( TurbineComponents%RotorFurl%Orientation(1,1)**2 + &
-                      TurbineComponents%RotorFurl%Orientation(1,2)**2 ) )
-          
-   CTilt     = COS( Tilt )
-   STilt     = SIN( Tilt )
 
-      
+   o%Rotor%Tilt = ATAN2( u%TurbineComponents%RotorFurl%Orientation(1,3), &
+                         SQRT( u%TurbineComponents%RotorFurl%Orientation(1,1)**2 + &
+                         u%TurbineComponents%RotorFurl%Orientation(1,2)**2 ) )
+
+   o%Rotor%CTilt     = COS( o%Rotor%Tilt )
+   o%Rotor%STilt     = SIN( o%Rotor%Tilt )
+
+
       ! HubVDue2Yaw - yaw velocity due solely to yaw
-      
-  AvgVelNacelleRotorFurlYaw = TurbineComponents%RotorFurl%RotationVel(3) - TurbineComponents%Nacelle%RotationVel(3)
-  AvgVelTowerBaseNacelleYaw = TurbineComponents%Nacelle%RotationVel(3)   - TurbineComponents%Tower%RotationVel(3)
-  AvgVelTowerBaseYaw        = TurbineComponents%Tower%RotationVel(3)    
-      
-  rRotorFurlHub(1:2)        = TurbineComponents%Hub%Position(1:2) - TurbineComponents%RotorFurl%Position(1:2)
-  rNacelleHub(1:2)          = TurbineComponents%Hub%Position(1:2) - TurbineComponents%Nacelle%Position(1:2)
-  rTowerBaseHub(1:2)        = TurbineComponents%Hub%Position(1:2) - TurbineComponents%Tower%Position(1:2)
-      
-  YawVel =   ( AvgVelNacelleRotorFurlYaw * rRotorFurlHub(2) + AvgVelTowerBaseNacelleYaw * rNacelleHub(2) &
-                    + AvgVelTowerBaseYaw * rTowerBaseHub(2) ) * SYaw &
-           - ( AvgVelNacelleRotorFurlYaw * rRotorFurlHub(1) + AvgVelTowerBaseNacelleYaw * rNacelleHub(1) &
-                    + AvgVelTowerBaseYaw * rTowerBaseHub(1) ) * CYaw
-                               
-   
+
+  AvgVelNacelleRotorFurlYaw = u%TurbineComponents%RotorFurl%RotationVel(3) - u%TurbineComponents%Nacelle%RotationVel(3)
+  AvgVelTowerBaseNacelleYaw = u%TurbineComponents%Nacelle%RotationVel(3)   - u%TurbineComponents%Tower%RotationVel(3)
+  AvgVelTowerBaseYaw        = u%TurbineComponents%Tower%RotationVel(3)
+
+  rRotorFurlHub(1:2)        = u%TurbineComponents%Hub%Position(1:2) - u%TurbineComponents%RotorFurl%Position(1:2)
+  rNacelleHub(1:2)          = u%TurbineComponents%Hub%Position(1:2) - u%TurbineComponents%Nacelle%Position(1:2)
+  rTowerBaseHub(1:2)        = u%TurbineComponents%Hub%Position(1:2) - u%TurbineComponents%Tower%Position(1:2)
+
+  o%Rotor%YawVel =   ( AvgVelNacelleRotorFurlYaw * rRotorFurlHub(2) + AvgVelTowerBaseNacelleYaw * rNacelleHub(2) &
+                         + AvgVelTowerBaseYaw * rTowerBaseHub(2) ) * o%Rotor%SYaw &
+                  - ( AvgVelNacelleRotorFurlYaw * rRotorFurlHub(1) + AvgVelTowerBaseNacelleYaw * rNacelleHub(1) &
+                         + AvgVelTowerBaseYaw * rTowerBaseHub(1) ) * o%Rotor%CYaw
+
+
    !.................................................................................................
    ! start of NewTime routine
    !.................................................................................................
 
-   AvgInfl = SumInfl * 2.0 / (R*R*NB)        ! Compute average inflow from the previous time step
-   SumInfl = 0.0                             ! reset to sum for the current time step
+   o%Rotor%AvgInfl = o%InducedVel%SumInfl * 2.0 / (p%Blade%R*p%Blade%R*p%Blade%NB)  ! Average inflow from the previous time step
+   o%InducedVel%SumInfl = 0.0   ! reset to sum for the current time step
 
-   CALL DiskVel()                            ! Get a sort of "Average velocity" - sets a bunch of stored variables...
+   CALL DiskVel(Time, P, O, ErrStat, ErrMess)  ! Get a sort of "Average velocity" - sets a bunch of stored variables...
 
-   IF ( DStall ) CALL BedUpdate()            ! update the old values to hold "current" values from last time step
+   IF ( P%DStall ) CALL BedUpdate( O )   ! that's an 'O' as in 'OtherState'
 
    ! Enter the dynamic inflow routines here
-   IF ( Wake )  CALL Inflow()  !bjj: perhaps we should send NoLoadsCalculated to initialize dynamic inflow [subroutine Infinit()] instead of the check that time > 0...?
+
+   IF ( p%Wake )  CALL Inflow(P, O, ErrStat, ErrMess)
+       !bjj: perhaps we should send NoLoadsCalculated to initialize dynamic inflow [subroutine Infinit()]
+       !bjj: instead of the check that time > 0...?
 
    !.................................................................................................
    ! end of NewTime routine
    !.................................................................................................
 
 
-   DO IBlade = 1,NB
-   
+   DO IBlade = 1,p%Blade%NB
+
          ! calculate the azimuth angle ( we add pi because AeroDyn defines 0 as pointing downward)
-         ! note: the equation below should use TurbineComponents%Blade markers, but this is used to get the 
-         ! same answers as the previous version (before v13.00.00)                          
-         
-      AzimuthAngle = ATAN2( -1.*DOT_PRODUCT( TurbineComponents%Hub%Orientation(3,:),         & 
-                                             TurbineComponents%RotorFurl%Orientation(2,:) ), &
-                                DOT_PRODUCT( TurbineComponents%Hub%Orientation(3,:),         &
-                                             TurbineComponents%RotorFurl%Orientation(3,:) )  ) + pi + (IBlade - 1)*TwoPiNB
-      
-      
-   
-      DO IElement = 1,NElm
-            
+         ! note: the equation below should use TurbineComponents%Blade markers, but this is used to get the
+         ! same answers as the previous version (before v13.00.00)
+
+      AzimuthAngle = ATAN2( -1.*DOT_PRODUCT( u%TurbineComponents%Hub%Orientation(3,:),         &
+                                             u%TurbineComponents%RotorFurl%Orientation(2,:) ), &
+                                DOT_PRODUCT( u%TurbineComponents%Hub%Orientation(3,:),         &
+                                             u%TurbineComponents%RotorFurl%Orientation(3,:) )  ) + pi + (IBlade - 1)*p%TwoPiNB
+
+
+
+      DO IElement = 1,p%Element%NElm
+
             ! calculate element pitch
-                                            
-         PitNow    = -1.*ATAN2( -1.*DOT_PRODUCT( TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
-                                                 InputMarkers%Blade(IElement,IBlade)%Orientation(2,:) ) , &
-                                    DOT_PRODUCT( TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
-                                                 InputMarkers%Blade(IElement,IBlade)%Orientation(1,:) )   )
-                    
-         SPitch    = SIN( PitNow )
-         CPitch    = COS( PitNow )
 
-         
+         o%Element%PitNow    = -1.*ATAN2( -1.*DOT_PRODUCT( u%TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
+                                                           u%InputMarkers(IBlade)%Orientation(2,:,IElement) ) , &
+                                              DOT_PRODUCT( u%TurbineComponents%Blade(IBlade)%Orientation(1,:),    &
+                                                           u%InputMarkers(IBlade)%Orientation(1,:,IElement) )   )
+
+         SPitch    = SIN( o%Element%PitNow )
+         CPitch    = COS( o%Element%PitNow )
+
+
             ! calculate distance between hub and element
-            
-         tmpVector = InputMarkers%Blade(IElement,IBlade)%Position(:) - TurbineComponents%Hub%Position(:)
-         rLocal = SQRT(   DOT_PRODUCT( tmpVector, TurbineComponents%Hub%Orientation(2,:) )**2  &
-                        + DOT_PRODUCT( tmpVector, TurbineComponents%Hub%Orientation(3,:) )**2  )
 
+         tmpVector = u%InputMarkers(IBlade)%Position(:,IElement) - u%TurbineComponents%Hub%Position(:)
+         rLocal = SQRT(   DOT_PRODUCT( tmpVector, u%TurbineComponents%Hub%Orientation(2,:) )**2  &
+                        + DOT_PRODUCT( tmpVector, u%TurbineComponents%Hub%Orientation(3,:) )**2  )
 
-                      
             ! determine if MulTabLoc should be set.  
-            ! bjj: I have no idea how this is really (supposed to be) used!!! .... 
-            
-         IF ( CurrentADOptions%SetMulTabLoc(IElement,IBlade)  ) THEN
-            MulTabLoc = CurrentADOptions%MulTabLoc(IElement,IBlade)
-         ELSE
-            MulTabLoc = 0.0
-         END IF
+     
+         O%AirFoil%MulTabLoc = u%MulTabLoc(IElement,IBlade)
          
-
          !-------------------------------------------------------------------------------------------
          ! Get wind velocity components; calculate velocity normal to the rotor squared
          ! Save variables for printing in a file later;
          !-------------------------------------------------------------------------------------------
-         VelocityVec(:)    = AD_WindVelocityWithDisturbance( InputMarkers%Blade(IElement,IBlade)%Position(:) )
-         VelNormalToRotor2 = ( VelocityVec(3) * STilt + (VelocityVec(1) * CYaw - VelocityVec(2) * SYaw) * CTilt )**2
-
+         VelocityVec(:)    = AD_WindVelocityWithDisturbance( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess, &
+                                                             u%InputMarkers(IBlade)%Position(:,IElement) )
+         VelNormalToRotor2 = ( VelocityVec(3) * o%Rotor%STilt + (VelocityVec(1) * o%Rotor%CYaw               &
+                             - VelocityVec(2) * o%Rotor%SYaw) * o%Rotor%CTilt )**2
 
          !-------------------------------------------------------------------------------------------
          ! reproduce GetVNVT routine:
          !-------------------------------------------------------------------------------------------
-         tmpVector =  -1.*SPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(1,:) &
-                        + CPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(2,:)
-         VTTotal   =     DOT_PRODUCT( tmpVector, VelocityVec - InputMarkers%Blade(IElement,IBlade)%TranslationVel  )
+         tmpVector =  -1.*SPitch*u%InputMarkers(IBlade)%Orientation(1,:,IElement) &
+                        + CPitch*u%InputMarkers(IBlade)%Orientation(2,:,IElement)
+         VTTotal   =     DOT_PRODUCT( tmpVector, VelocityVec - u%InputMarkers(IBlade)%TranslationVel(:,IElement)  )
 
-         tmpVector =     CPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(1,:) &
-                       + SPitch*InputMarkers%Blade(IElement,IBlade)%Orientation(2,:)
+         tmpVector =     CPitch*u%InputMarkers(IBlade)%Orientation(1,:,IElement) &
+                       + SPitch*u%InputMarkers(IBlade)%Orientation(2,:,IElement)
          VNWind    =     DOT_PRODUCT( tmpVector, VelocityVec )
-         VNElement = -1.*DOT_PRODUCT( tmpVector, InputMarkers%Blade(IElement,IBlade)%TranslationVel )  ! = DOT_PRODUCT( CurrentInputs%TransVel, -1.*Orientation )
-
+         VNElement = -1.*DOT_PRODUCT( tmpVector, u%InputMarkers(IBlade)%TranslationVel(:,IElement ) )
 
          !-------------------------------------------------------------------------------------------
          ! Get blade element forces and induced velocity
          !-------------------------------------------------------------------------------------------
-         CALL ELEMFRC( AzimuthAngle, rLocal, IElement, IBlade, VelNormalToRotor2, VTTotal, VNWind, &
-                       VNElement, DFN, DFT, PMA, NoLoadsCalculated )  
+         CALL ELEMFRC( p, O, ErrStat, ErrMess,                             &
+                       AzimuthAngle, rLocal, IElement, IBlade, VelNormalToRotor2, VTTotal, VNWind, &
+                       VNElement, DFN, DFT, PMA, o%NoLoadsCalculated )
 
          !-------------------------------------------------------------------------------------------
          ! Set up dynamic inflow parameters
          !-------------------------------------------------------------------------------------------
-         IF ( DynInfl .OR. DynInit ) THEN
-            CALL GetRM (rLocal, DFN, DFT, AzimuthAngle, IElement, IBlade)
+         IF ( p%DynInfl .OR. O%DynInit ) THEN
+            CALL GetRM (P, O, ErrStat, ErrMess, &
+                        rLocal, DFN, DFT, AzimuthAngle, IElement, IBlade)
          ENDIF
 
-         ADCurrentLoads%Blade(IElement,IBlade)%Force(1)  = ( DFN*CPitch + DFT*SPitch ) / DR(IElement)
-         ADCurrentLoads%Blade(IElement,IBlade)%Force(2)  = ( DFN*SPitch - DFT*CPitch ) / DR(IElement)
-         ADCurrentLoads%Blade(IElement,IBlade)%Force(3)  = 0.0
+         o%StoredForces(1,IElement,IBlade)  = ( DFN*CPitch + DFT*SPitch ) / p%Blade%DR(IElement)
+         o%StoredForces(2,IElement,IBlade)  = ( DFN*SPitch - DFT*CPitch ) / p%Blade%DR(IElement)
+         o%StoredForces(3,IElement,IBlade)  = 0.0
 
-         ADCurrentLoads%Blade(IElement,IBlade)%Moment(1) = 0.0
-         ADCurrentLoads%Blade(IElement,IBlade)%Moment(2) = 0.0
-         ADCurrentLoads%Blade(IElement,IBlade)%Moment(3) = PMA / DR(IElement)
+         o%StoredMoments(1,IElement,IBlade)  = 0.0
+         o%StoredMoments(2,IElement,IBlade)  = 0.0
+         o%StoredMoments(3,IElement,IBlade)  = PMA / p%Blade%DR(IElement)
 
+!      DO IBlade=1,p%Blade%NB
+!       DO IElement=1,p%Element%Nelm
+!         y%OutputLoads(IBlade)%Force(:,IElement)  = o%StoredForces(:,IElement,IBlade)
+!         y%OutputLoads(IBlade)%Moment(:,IElement) = o%StoredMoments(:,IElement,IBlade)
+!       ENDDO
+!!      ENDDO
 
             ! save velocities for output, if requested
 
-         IF ( WndElPrList(IElement) > 0 ) THEN
-            SaveVX( WndElPrList(IElement), IBlade ) = VelocityVec(1)
-            SaveVY( WndElPrList(IElement), IBlade ) = VelocityVec(2)
-            SaveVZ( WndElPrList(IElement), IBlade ) = VelocityVec(3)
+         IF ( O%ElOut%WndElPrList(IElement) > 0 ) THEN
+            O%ElOut%SaveVX( O%ElOut%WndElPrList(IElement), IBlade ) = VelocityVec(1)
+            O%ElOut%SaveVY( O%ElOut%WndElPrList(IElement), IBlade ) = VelocityVec(2)
+            O%ElOut%SaveVZ( O%ElOut%WndElPrList(IElement), IBlade ) = VelocityVec(3)
          ENDIF
-         
+
 
       END DO !IElement
 
-      IF ( IBlade == 1 .AND. ElemPrn ) THEN
-         VXSAV  = VelocityVec(1)
-         VYSAV  = VelocityVec(2)
-         VZSAV  = VelocityVec(3)
+      IF ( IBlade == 1 .AND. p%ElemPrn ) THEN
+         O%ElOut%VXSAV  = VelocityVec(1)
+         O%ElOut%VYSAV  = VelocityVec(2)
+         O%ElOut%VZSAV  = VelocityVec(3)
       ENDIF
 
 
    END DO !IBlade
 
-   NoLoadsCalculated = .FALSE.
+   O%NoLoadsCalculated = .FALSE.
+
+   CurrentTime = Time
+   DT = o%DT
+   DO IBlade=1,p%Blade%NB
+     DO IElement=1,p%Element%Nelm
+       y%OutputLoads(IBlade)%Force(:,IElement)  = o%StoredForces(:,IElement,IBlade)
+       y%OutputLoads(IBlade)%Moment(:,IElement) = o%StoredMoments(:,IElement,IBlade)
+     ENDDO
+   ENDDO
+
+
    
-   AD_CalculateLoads = ADCurrentLoads
-
-
-END FUNCTION  AD_CalculateLoads
-!====================================================================================================
-FUNCTION AD_GetConstant(VarName, ErrStat)
-!  This function returns a real scalar value whose name is listed in the VarName input argument.
-!  If the name is not recognized, an error is returned in ErrStat.
-!----------------------------------------------------------------------------------------------------
-
-   USE                              AD_IOParams,   ONLY: UnADin
-   USE                              AeroTime,      ONLY: DTAero
-   USE                              Rotor,         ONLY: HH
-   USE                              Wind,          ONLY: KinVisc, RHO
-
-   CHARACTER(*),   INTENT(IN)    :: VarName
-   INTEGER,        INTENT(OUT)   :: ErrStat
-   REAL(ReKi)                    :: AD_GetConstant
-
-   CHARACTER(20)                 :: VarNameUC
-
-
-   !-------------------------------------------------------------------------------------------------
-   ! Get the name of the requested variable in upper case
-   !-------------------------------------------------------------------------------------------------
-   VarNameUC = VarName
-   CALL Conv2UC( VarNameUC )
-
-
-   !-------------------------------------------------------------------------------------------------
-   ! Check for parameter values that can be returned without checking initialization
-   !-------------------------------------------------------------------------------------------------
-   SELECT CASE ( TRIM(VarNameUC) )
-
-      CASE ( 'UNADIN', 'ADUNIT' )
-         AD_GetConstant = UnADin
-         ErrStat = 0
+         ! Allocate the InflowWind derived types.  This is OK for now because InflowWind is being used as a submodule of AeroDyn.
+   IF (.NOT. ALLOCATED(IfW_Inputs%Position) ) THEN
+      CALL AllocAry( IfW_Inputs%Position, 3, 1, "position vectors to be sent to IfW_CalcOutput", ErrStatLcl, ErrMessLcl )
+      IF ( ErrStatLcl >= AbortErrLev )  THEN
+         CALL ExitThisRoutine ( ErrStatLcl, ErrMessLcl )
          RETURN
-
-   END SELECT
-
-
-   !-------------------------------------------------------------------------------------------------
-   ! Check that the module has been initialized.
-   !-------------------------------------------------------------------------------------------------
-
-   IF ( .NOT. Initialized ) THEN
-      CALL WrScr( ' Initialialize AeroDyn before calling its subroutines.' )
-      ErrStat = 1
-      RETURN
-   ELSE
-      ErrStat = 0
-   END IF
-
-   !-------------------------------------------------------------------------------------------------
-   ! Return the requested NON-PARAMETER values.
-   !-------------------------------------------------------------------------------------------------
-
-
-   SELECT CASE ( TRIM(VarNameUC) )
-
-      CASE ( 'REFHT', 'HH' )  !BJJ: REFWINDHT  ???
-         AD_GetConstant = HH
-
-      CASE ( 'DT','DTAERO' )
-         AD_GetConstant = DTAero
-
-      CASE ( 'AIRDENSITY', 'RHO' )
-         AD_GetConstant = RHO
-
-      CASE ( 'KINVISC' )   !bjj: more descriptive name?
-         AD_GetConstant = KinVisc
-
-      CASE DEFAULT
-         CALL WrScr( ' Invalid variable name in AD_GetConstant().' )
-         ErrStat        = 1
-         AD_GetConstant = 0.0
-
-   END SELECT
-
-END FUNCTION AD_GetConstant
-!====================================================================================================
-FUNCTION AD_GetCurrentValue(VarName, ErrStat, IBlade, IElement)
-!  This function returns a real scalar value whose name is listed in the VarName input argument.
-!  If the name is not recognized, an error is returned in ErrStat.
-!----------------------------------------------------------------------------------------------------
-
-   USE                           Rotor,      ONLY: AvgInfl
-   USE                           ElemInflow, ONLY: W2, Alpha
-
-
-   CHARACTER(*),      INTENT(IN) :: VarName
-   INTEGER, OPTIONAL, INTENT(IN) :: IBlade
-   INTEGER, OPTIONAL, INTENT(IN) :: IElement
-   INTEGER,           INTENT(OUT):: ErrStat
-   REAL(ReKi)                    :: AD_GetCurrentValue
-
-
-   CHARACTER(20)                 :: VarNameUC
+      END IF   
+   END IF   
+   
 
 
 
-   !-------------------------------------------------------------------------------------------------
-   ! Check that the module has been initialized.
-   !-------------------------------------------------------------------------------------------------
+      ! Loop through all the tower nodes to calculate the aerodynamic loads on the tower if aerodynamics were requested.
 
-   IF ( .NOT. Initialized ) THEN
-      CALL WrScr( ' Initialialize AeroDyn before calling its subroutines.' )
-      ErrStat = 1
-      AD_GetCurrentValue = 0.0
-      RETURN
-   ELSE IF ( NoLoadsCalculated ) THEN
-      CALL WrScr( ' Calculate aerodynamic loads before trying to return current values.' )
-      ErrStat = 1
-      AD_GetCurrentValue = 0.0
-      RETURN
-   ELSE
-      ErrStat = 0
-   END IF
+   IF ( p%TwrProps%CalcTwrAero )  THEN
 
-   !-------------------------------------------------------------------------------------------------
-   ! Return the requested values.
-   !-------------------------------------------------------------------------------------------------
 
-   VarNameUC = VarName
-   CALL Conv2UC( VarNameUC )
 
-   SELECT CASE ( TRIM(VarNameUC) )
 
-      CASE ( 'AVGINFL', 'AVGINFLOW' )     !bjj this might not be necessary when tail fin aero is removed from structural code
-         AD_GetCurrentValue = AvgInfl
 
-      CASE ( 'W2' )
-         IF (.NOT. PRESENT(IBlade) .OR. .NOT. PRESENT(IElement) ) THEN
-            CALL WrScr( 'IBlade and IElement parameters are required to return W2 in AeroDyn/AD_GetCurrentValue')
-            ErrStat = 1
-            AD_GetCurrentValue = 0
-         ELSE
-            AD_GetCurrentValue = W2(IElement, IBlade )
-         END IF
+      DO Node=1,u%Twr_InputMarkers%Nnodes
 
-      CASE ( 'ALPHA' )
-         IF (.NOT. PRESENT(IBlade) .OR. .NOT. PRESENT(IElement) ) THEN
-            CALL WrScr( 'IBlade and IElement parameters are required to return ALPHA in AeroDyn/AD_GetCurrentValue')
-            ErrStat = 1
-            AD_GetCurrentValue = 0
-         ELSE
-            AD_GetCurrentValue = ALPHA(IElement, IBlade )
+
+            ! Set the location of the node in the global coordinate system for IfW.
+
+         IfW_Inputs%Position(:,1) = u%Twr_InputMarkers%TranslationDisp(:,Node) + u%Twr_InputMarkers%Position(:,Node)
+!mlb: debug
+!IfW_Inputs%Position(:,1) = [ 0.0, 0.0, 10.0 ]
+
+            ! Get the absolute wind velocity vector for this node from IfW.
+
+         CALL IfW_CalcOutput( Time, IfW_Inputs, p%IfW_Params, &
+                                    x%IfW_ContStates, xd%IfW_DiscStates, z%IfW_ConstrStates, O%IfW_OtherStates, &   ! States -- none in this case
+                                    y%IfW_Outputs, ErrStatLcl, ErrMessLcl )
+
+         IF ( ErrStatLcl >= AbortErrLev )  THEN
+            CALL ExitThisRoutine ( ErrStatLcl, ErrMessLcl )
+            RETURN
          END IF
 
 
-      CASE DEFAULT
-         CALL WrScr( ' Invalid variable name in AD_GetCurrentValue().' )
-         ErrStat = 1
-         AD_GetCurrentValue = 0.0
+            ! Calculate the aerodynamic load on this tower node: TwrAeroLoads ( p, Node, NodeDCMGbl, NodeVelGbl, NodeWindVelGbl, NodeFrcGbl )
 
-   END SELECT
+         CALL TwrAeroLoads ( p, Node, u%Twr_InputMarkers%Orientation(:,:,Node), u%Twr_InputMarkers%TranslationVel(:,Node) &
+                           , y%IfW_Outputs%Velocity(:,1), y%Twr_OutputLoads%Force(:,Node) )
 
-END FUNCTION AD_GetCurrentValue
+      END DO ! Node
+
+   END IF ! ( p%TwrProps%CalcTwrAero )
+
+   
+   !................................................................................................
+      ! Calculate the HH wind speed. (Do this at the end, after all the calls to IfW_CalcOutput are complete.)
+
+!MLB: This assumes that the hub height is constant, which is not a valid assumption.  But what do people really want, a fixed or "floating" HH wind speed?
+   IfW_Inputs%Position(:,1) = (/0.0_ReKi, 0.0_ReKi, p%Rotor%HH /)
+
+   CALL IfW_CalcOutput( Time, IfW_Inputs, p%IfW_Params, &
+                              x%IfW_ContStates, xd%IfW_DiscStates, z%IfW_ConstrStates, O%IfW_OtherStates, &   ! States -- none in this case
+                              y%IfW_Outputs, ErrStat, ErrMess )
+
+   if (.not. allocated( y%IfW_Outputs%WriteOutput ) ) then
+      CALL AllocAry( y%IfW_Outputs%WriteOutput, 3, "y%IfW_Outputs%WriteOutput", ErrStat, ErrMess )
+         IF (ErrStat >= AbortErrLev)  RETURN
+   end if
+
+   y%IfW_Outputs%WriteOutput = y%IfW_Outputs%Velocity(:,1)
+
+   !................................................................................................
+      
+   
+   CALL ElemOut(time, P, O )
+   
+   CALL ExitThisRoutine ( ErrID_None, "no errors" )
+
+   RETURN
+
+   !=======================================================================
+   CONTAINS
+   !=======================================================================
+   SUBROUTINE ExitThisRoutine ( ErrID, Msg )
+
+
+      ! This subroutine cleans up the parent routine before exiting.
+
+
+         ! Argument declarations.
+
+      INTEGER(IntKi), INTENT(IN)                :: ErrID                      ! The error identifier (ErrStat)
+
+      CHARACTER(*),   INTENT(IN)                :: Msg                        ! The error message (ErrMess)
+
+
+
+         ! Set error status/message
+
+      ErrStat = ErrID
+      ErrMess = Msg
+
+
+         ! Deallocate the IfW_Inputs%Position array if it had been allocated.
+
+      IF ( ALLOCATED( IfW_Inputs%Position ) )  DEALLOCATE( IfW_Inputs%Position )
+
+
+      RETURN
+
+   END SUBROUTINE ExitThisRoutine ! ( ErrID, Msg )
+
+
+
+END SUBROUTINE AD_CalcOutput
+
+!----------------------------------------------------------------------------------------------------------------------------------
+SUBROUTINE AD_CalcContStateDeriv( Time, u, p, x, xd, z, OtherState, dxdt, ErrStat, ErrMess )
+! Tight coupling routine for computing derivatives of continuous states
+!..................................................................................................................................
+
+      REAL(DbKi),                        INTENT(IN   )  :: Time        ! Current simulation time in seconds
+      TYPE(AD_InputType),           INTENT(IN   )  :: u           ! Inputs at Time
+      TYPE(AD_ParameterType),       INTENT(IN   )  :: p           ! Parameters
+      TYPE(AD_ContinuousStateType), INTENT(IN   )  :: x           ! Continuous states at Time
+      TYPE(AD_DiscreteStateType),   INTENT(IN   )  :: xd          ! Discrete states at Time
+      TYPE(AD_ConstraintStateType), INTENT(IN   )  :: z           ! Constraint states at Time
+      TYPE(AD_OtherStateType),      INTENT(INOUT)  :: OtherState  ! Other/optimization states
+      TYPE(AD_ContinuousStateType), INTENT(  OUT)  :: dxdt        ! Continuous state derivatives at Time
+      INTEGER(IntKi),                    INTENT(  OUT)  :: ErrStat     ! Error status of the operation
+      CHARACTER(*),                      INTENT(  OUT)  :: ErrMess      ! Error message if ErrStat /= ErrID_None
+
+
+         ! Initialize ErrStat
+
+      ErrStat = ErrID_None
+      ErrMess  = ""
+
+
+         ! Compute the first time derivatives of the continuous states here:
+
+     dxdt%DummyDiscState = 0
+
+
+END SUBROUTINE AD_CalcContStateDeriv
+!----------------------------------------------------------------------------------------------------------------------------------
+SUBROUTINE AD_UpdateDiscState( Time, u, p, x, xd, z, OtherState, ErrStat, ErrMess )
+! Tight coupling routine for updating discrete states
+!..................................................................................................................................
+
+      REAL(DbKi),                        INTENT(IN   )  :: Time        ! Current simulation time in seconds
+      TYPE(AD_InputType),           INTENT(IN   )  :: u           ! Inputs at Time
+      TYPE(AD_ParameterType),       INTENT(IN   )  :: p           ! Parameters
+      TYPE(AD_ContinuousStateType), INTENT(IN   )  :: x           ! Continuous states at Time
+      TYPE(AD_DiscreteStateType),   INTENT(INOUT)  :: xd          ! Input: Discrete states at Time;
+                                                                       !   Output: Discrete states at Time + Interval
+      TYPE(AD_ConstraintStateType), INTENT(IN   )  :: z           ! Constraint states at Time
+      TYPE(AD_OtherStateType),      INTENT(INOUT)  :: OtherState  ! Other/optimization states
+      INTEGER(IntKi),                    INTENT(  OUT)  :: ErrStat     ! Error status of the operation
+      CHARACTER(*),                      INTENT(  OUT)  :: ErrMess      ! Error message if ErrStat /= ErrID_None
+
+
+         ! Initialize ErrStat
+
+      ErrStat = ErrID_None
+      ErrMess  = ""
+
+
+         ! Update discrete states here:
+
+      ! StateData%DiscState =
+
+END SUBROUTINE AD_UpdateDiscState
+!----------------------------------------------------------------------------------------------------------------------------------
+SUBROUTINE AD_CalcConstrStateResidual( Time, u, p, x, xd, z, OtherState, z_residual, ErrStat, ErrMess )
+! Tight coupling routine for solving for the residual of the constraint state equations
+!..................................................................................................................................
+
+      REAL(DbKi),                        INTENT(IN   )  :: Time        ! Current simulation time in seconds
+      TYPE(AD_InputType),           INTENT(IN   )  :: u           ! Inputs at Time
+      TYPE(AD_ParameterType),       INTENT(IN   )  :: p           ! Parameters
+      TYPE(AD_ContinuousStateType), INTENT(IN   )  :: x           ! Continuous states at Time
+      TYPE(AD_DiscreteStateType),   INTENT(IN   )  :: xd          ! Discrete states at Time
+      TYPE(AD_ConstraintStateType), INTENT(IN   )  :: z           ! Constraint states at Time (possibly a guess)
+      TYPE(AD_OtherStateType),      INTENT(INOUT)  :: OtherState  ! Other/optimization states
+      TYPE(AD_ConstraintStateType), INTENT(  OUT)  :: z_residual  ! Residual of the constraint state equations using
+                                                                       !     the input values described above
+      INTEGER(IntKi),                    INTENT(  OUT)  :: ErrStat     ! Error status of the operation
+      CHARACTER(*),                      INTENT(  OUT)  :: ErrMess      ! Error message if ErrStat /= ErrID_None
+
+
+         ! Initialize ErrStat
+
+      ErrStat = ErrID_None
+      ErrMess  = ""
+
+
+         ! Solve for the constraint states here:
+
+      z_residual%DummyConstrState = 0
+
+END SUBROUTINE AD_CalcConstrStateResidual
+
 !====================================================================================================
-FUNCTION AD_GetUndisturbedWind ( Time, InputPosition, ErrStat)
-! This function returns the U-V-W wind speeds at the specified time and X-Y-Z location
-!----------------------------------------------------------------------------------------------------
-
-      ! Passed variables
-
-   REAL(ReKi), INTENT(IN)   :: Time
-   REAL(ReKi), INTENT(IN)   :: InputPosition(3)
-   INTEGER,    INTENT(OUT)  :: ErrStat
-
-      ! function definition
-
-   REAL(ReKi)               :: AD_GetUndisturbedWind(3)
-
-      ! local variables
-
-   TYPE(InflIntrpOut)       :: InflowVel
-
-
-   !-------------------------------------------------------------------------------------------------
-   ! get the wind speed (the wind inflow module will check that it's initialized)
-   !-------------------------------------------------------------------------------------------------
-
-   InflowVel = WindInf_GetVelocity( Time, InputPosition, ErrStat)
-
-   IF (ErrStat /=0) CALL ProgWarn( ' Error getting velocity in AeroDyn/AD_GetUndisturbedWind().' )
-
-   AD_GetUndisturbedWind(:) = InflowVel%Velocity(:)
-
-END FUNCTION AD_GetUndisturbedWind
-!====================================================================================================
-SUBROUTINE AD_Terminate(ErrStat)
-! This subroutine is called at program termination.  It deallocates variables and closes files.
-!----------------------------------------------------------------------------------------------------
-
-   USE            AeroSubs
-   USE            ElOutParams, ONLY: UnElem, UnWndOut
-
-   INTEGER,       INTENT(OUT) :: ErrStat                    ! Determines if an error was encountered
-
-   !-------------------------------------------------------------------------------------------------
-   ! Terminate other modules
-   !-------------------------------------------------------------------------------------------------
-   CALL WindInf_Terminate( ErrStat )
-
-   CALL AeroDyn_Terminate( )          ! rename this when we can
-
-   !-------------------------------------------------------------------------------------------------
-   ! Deallocate arrays
-   !-------------------------------------------------------------------------------------------------
-
-   IF ( ALLOCATED( ADCurrentLoads%Blade ) ) DEALLOCATE( ADCurrentLoads%Blade )
-
-   !-------------------------------------------------------------------------------------------------
-   ! Close any open files
-   !-------------------------------------------------------------------------------------------------
-   CLOSE( UnElem )
-   CLOSE( UnWndOut )
-
-   CALL CloseEcho()
-
-   !-------------------------------------------------------------------------------------------------
-   ! Reset the initialization flag
-   !-------------------------------------------------------------------------------------------------
-   Initialized       = .FALSE.
-   NoLoadsCalculated = .TRUE.
-
-   ErrStat     = 0
-
-
-END SUBROUTINE AD_Terminate
-
-!====================================================================================================
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+! WE ARE NOT YET IMPLEMENTING THE JACOBIANS...
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!----------------------------------------------------------------------------------------------------------------------------------
 
 END MODULE AeroDyn
+!**********************************************************************************************************************************
+

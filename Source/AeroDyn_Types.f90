@@ -382,7 +382,6 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: DummyOtherState 
     REAL(DbKi)  :: DT 
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: ElPrNum 
-    REAL(DbKi)  :: Time 
     REAL(DbKi)  :: OldTime 
     REAL(ReKi)  :: HubLoss = 1 
     REAL(ReKi)  :: Loss = 1 
@@ -7444,7 +7443,6 @@ IF (ALLOCATED(SrcOtherStateData%ElPrNum)) THEN
    END IF
    DstOtherStateData%ElPrNum = SrcOtherStateData%ElPrNum
 ENDIF
-   DstOtherStateData%Time = SrcOtherStateData%Time
    DstOtherStateData%OldTime = SrcOtherStateData%OldTime
    DstOtherStateData%HubLoss = SrcOtherStateData%HubLoss
    DstOtherStateData%Loss = SrcOtherStateData%Loss
@@ -7597,7 +7595,6 @@ ENDIF
   Int_BufSz  = Int_BufSz  + 1  ! DummyOtherState
   Db_BufSz   = Db_BufSz   + 1  ! DT
   Int_BufSz   = Int_BufSz   + SIZE( InData%ElPrNum )  ! ElPrNum 
-  Db_BufSz   = Db_BufSz   + 1  ! Time
   Db_BufSz   = Db_BufSz   + 1  ! OldTime
   Re_BufSz   = Re_BufSz   + 1  ! HubLoss
   Re_BufSz   = Re_BufSz   + 1  ! Loss
@@ -7680,8 +7677,6 @@ ENDIF
     IF ( .NOT. OnlySize ) IntKiBuf ( Int_Xferred:Int_Xferred+(SIZE(InData%ElPrNum))-1 ) = PACK(InData%ElPrNum ,.TRUE.)
     Int_Xferred   = Int_Xferred   + SIZE(InData%ElPrNum)
   ENDIF
-  IF ( .NOT. OnlySize ) DbKiBuf ( Db_Xferred:Db_Xferred+(1)-1 ) =  (InData%Time )
-  Db_Xferred   = Db_Xferred   + 1
   IF ( .NOT. OnlySize ) DbKiBuf ( Db_Xferred:Db_Xferred+(1)-1 ) =  (InData%OldTime )
   Db_Xferred   = Db_Xferred   + 1
   IF ( .NOT. OnlySize ) ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) =  (InData%HubLoss )
@@ -7918,8 +7913,6 @@ ENDIF
   DEALLOCATE(mask1)
     Int_Xferred   = Int_Xferred   + SIZE(OutData%ElPrNum)
   ENDIF
-  OutData%Time = DbKiBuf ( Db_Xferred )
-  Db_Xferred   = Db_Xferred   + 1
   OutData%OldTime = DbKiBuf ( Db_Xferred )
   Db_Xferred   = Db_Xferred   + 1
   OutData%HubLoss = ReKiBuf ( Re_Xferred )

@@ -593,8 +593,7 @@ SUBROUTINE AD_Init( InitInp, u, p, x, xd, z, O, y, Interval, InitOut, ErrStat, E
    !-------------------------------------------------------------------------------------------------
    o%InducedVel%SumInfl     = 0.0
    o%Rotor%AvgInfl     = 0.0
-   o%Time        = 0.0
-   o%OldTime     = 0.0
+   o%OldTime     = 0.0_DbKi
 
    p%TwoPiNB     = TwoPi / REAL( NB, ReKi )
 
@@ -765,7 +764,6 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
 
 
       ! Local variables
-   REAL(DbKi)                 :: CurrentTime, DT
    REAL(DbKi), PARAMETER      :: OnePlusEpsilon = 1 + EPSILON(Time)
 
    REAL(ReKi)                 :: VNElement
@@ -830,7 +828,6 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
          ! First we reset the DTAERO parameters for next time
       o%DT      = Time - o%OldTime     !bjj: DT = 0 on first step,
                                        !but the subroutines that use DT check for NoLoadsCalculated (or time > 0)
-      o%Time = Time  ! used inside aerodyn
       o%OldTime = Time
 
    ELSE IF ( .NOT. p%LinearizeFlag ) THEN
@@ -907,7 +904,6 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
    !-------------------------------------------------------------------------------------------------
    ! Calculate the forces and moments for the blade: SUBROUTINE AeroFrcIntrface( FirstLoop, JElemt, DFN, DFT, PMA )
    !-------------------------------------------------------------------------------------------------
-   o%Time      = Time
 
       ! calculate rotor speed
       ! note: Subtracting the RotorFurl rotational velocity for REVS is needed to get the
@@ -965,7 +961,7 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
 
    ! Enter the dynamic inflow routines here
 
-   IF ( p%Wake )  CALL Inflow(P, O, ErrStat, ErrMess)
+   IF ( p%Wake )  CALL Inflow(Time, P, O, ErrStat, ErrMess)
        !bjj: perhaps we should send NoLoadsCalculated to initialize dynamic inflow [subroutine Infinit()]
        !bjj: instead of the check that time > 0...?
 
@@ -1083,8 +1079,7 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
 
    O%NoLoadsCalculated = .FALSE.
 
-   CurrentTime = Time
-   DT = o%DT
+
    DO IBlade=1,p%Blade%NB
      DO IElement=1,p%Element%Nelm
        y%OutputLoads(IBlade)%Force(:,IElement)  = o%StoredForces(:,IElement,IBlade)

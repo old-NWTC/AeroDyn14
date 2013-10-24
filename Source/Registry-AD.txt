@@ -319,7 +319,6 @@ typedef	^	ConstraintStateType	IfW_ConstraintStateType	IfW_ConstrStates	-	-	-		-
 typedef	^	OtherStateType	IntKi	DummyOtherState	-	-	-		-
 typedef	^	OtherStateType	DbKi	DT	-	-	-	"Time step"	seconds
 typedef	^	OtherStateType	IntKi	ElPrNum	{:}	-	-		-
-typedef	^	OtherStateType	DbKi	Time	-	-	-
 typedef	^	OtherStateType	DbKi	OldTime	-	-	-
 typedef	^	OtherStateType	ReKi	HubLoss	-	1	-	# was saved in AXIND
 typedef	^	OtherStateType	ReKi	Loss	-	1	-	# was saved in AXIND

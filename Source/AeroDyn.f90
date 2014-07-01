@@ -1,6 +1,6 @@
 !**********************************************************************************************************************************
 ! LICENSING
-! Copyright (C) 2012  National Renewable Energy Laboratory
+! Copyright (C) 2012-2014  National Renewable Energy Laboratory
 !
 !    This file is part of AeroDyn.
 !
@@ -31,7 +31,7 @@ MODULE AeroDyn
 
    PRIVATE
 
-   TYPE(ProgDesc), PARAMETER            :: AD_Ver = ProgDesc( 'AeroDyn', 'v14.02.01b-bjj', '29-Jan-2014' )
+   TYPE(ProgDesc), PARAMETER            :: AD_Ver = ProgDesc( 'AeroDyn', 'v14.02.01c-bjj', '30-June-2014' )
 
       ! ..... Public Subroutines ............
 

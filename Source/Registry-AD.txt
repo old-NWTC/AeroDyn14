@@ -409,7 +409,6 @@ typedef	^	ParameterType	IfW_ParameterType	IfW_Params	-	-	-		-
 typedef	^	InputType	MeshType	InputMarkers	{:}	-	-	"Input Forces and positions for the blades (mesh) for each blade"	-
 typedef	^	InputType	MeshType	Twr_InputMarkers	-	-	-	"Input Forces and positions for the tower (mesh)"	-
 typedef	^	InputType	AeroConfig	TurbineComponents	-	-	-	"Current locations of components"
-#typedef	^	InputType	LOGICAL	SetMulTabLoc	{:}{:}
 typedef	^	InputType	ReKi	MulTabLoc	{:}{:}
 
 # ..... Outputs ...................................................................................................................

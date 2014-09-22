@@ -16,6 +16,7 @@
 ###################################################################################################################################
 include	Registry_NWTC_Library.txt
 usefrom	InflowWind.txt
+usefrom Registry-DWM.txt
 
 # AeroDyn Subtypes
 typedef	AeroDyn/AD	Marker	Reki	Position	3	0.0	-		-
@@ -286,6 +287,7 @@ typedef	^	InitInputType	CHARACTER(1024)	OutRootName	-	-	-
 typedef	^	InitInputType	CHARACTER(1024)	ADFileName	-	-	-	"AeroDyn file name"
 typedef	^	InitInputType	CHARACTER(1024)	WindFileName	-	-	-	"Inflow init file name"
 typedef	^	InitInputType	LOGICAL	WrSumFile	-	-	-	"T/F: Write an AeroDyn summary"
+typedef	^	InitInputType	LOGICAL	UseDWM	-	.FALSE.	-		-
 typedef	^	InitInputType	INTEGER	NumBl	-	-	-	"Number of Blades"
 #typedef	^	InitInputType	INTEGER	NBlInpSt	-	-	-	"Number of Blade Input Stations"
 typedef	^	InitInputType	ReKi	BladeLength	-	-	-	"Blade Length"
@@ -298,22 +300,28 @@ typedef	^	InitInputType	AeroConfig	TurbineComponents	-	-	-		-
 typedef	^	InitInputType	INTEGER	NumTwrNodes	-	-	-	"Number of ElastoDyn tower nodes.  Tower drag will be computed at those points."
 typedef	^	InitInputType	ReKi	TwrNodeLocs	{:}{:}	-	-	"Location of ElastoDyn tower nodes with respect to the inertial origin."	-
 typedef	^	InitInputType	IfW_InitInputType	IfW_InitInputs	-	-	-		-
+typedef	^	InitInputType	DWM_InitInputType	DWM_InitInputs	-	-	-		-
 # Define outputs from the initialization routine here:
 typedef	AeroDyn/AD	InitOutputType	ProgDesc	Ver	-	-	-	"version information"
 typedef	^	InitOutputType	IfW_InitOutputType	IfW_InitOutput	-	-	-		-
+typedef	^	InitOutputType	DWM_InitOutputType	DWM_InitOutput	-	-	-		-
+
 
 # ..... States ....................................................................................................................
 # Define continuous (differentiable) states here:
 typedef	^	ContinuousStateType	ReKi	DummyDiscState	-	-	-		-
 typedef	^	ContinuousStateType	IfW_ContinuousStateType	IfW_ContStates	-	-	-		-
+typedef	^	ContinuousStateType	DWM_ContinuousStateType	DWM_ContStates	-	-	-		-
 
 # Define discrete (nondifferentiable) states here:
 typedef	^	DiscreteStateType	ReKi	DummyDiscState	-	-	-		-
 typedef	^	DiscreteStateType	IfW_DiscreteStateType	IfW_DiscStates	-	-	-		-
+typedef	^	DiscreteStateType	DWM_DiscreteStateType	DWM_DiscStates	-	-	-		-
 
 # Define constraint states here:
 typedef	^	ConstraintStateType	ReKi	DummyConstrState	-	-	-		-
 typedef	^	ConstraintStateType	IfW_ConstraintStateType	IfW_ConstrStates	-	-	-		-
+typedef	^	ConstraintStateType	DWM_ConstraintStateType	DWM_ConstrStates	-	-	-		-
 
 # JM: At this point, I don't know which of these are actually discrete, continuous, or constraint, so they're all other states for now
 # Define "other" states (any data that are not considered actual states) here:
@@ -333,6 +341,7 @@ typedef	^	OtherStateType	LOGICAL	OnePassDynDbg	-	.TRUE.	-	#
 typedef	^	OtherStateType	LOGICAL	NoLoadsCalculated	-	.TRUE.	-		-
 typedef	^	OtherStateType	IntKi	NERRORS	-	0	-	# was saved variable in vinderr
 typedef	^	OtherStateType	IfW_OtherStateType	IfW_OtherStates	-	-	-		-
+typedef	^	OtherStateType	DWM_OtherStateType	DWM_OtherStates	-	-	-		-
 #AirFoil
 typedef	^	OtherStateType	AirFoil	AirFoil
 #Beddoes
@@ -401,6 +410,7 @@ typedef	^	ParameterType	InducedVelParms	InducedVel
 typedef	^	ParameterType	WindParms	Wind
 typedef	^	ParameterType	RotorParms	Rotor
 typedef	^	ParameterType	IfW_ParameterType	IfW_Params	-	-	-		-
+typedef	^	ParameterType	DWM_ParameterType	DWM_Params	-	-	-		-
 
 
 # ..... Inputs ....................................................................................................................
@@ -410,6 +420,7 @@ typedef	^	ParameterType	IfW_ParameterType	IfW_Params	-	-	-		-
 typedef	^	InputType	MeshType	InputMarkers	{:}	-	-	"Input Forces and positions for the blades (mesh) for each blade"	-
 typedef	^	InputType	MeshType	Twr_InputMarkers	-	-	-	"Input Forces and positions for the tower (mesh)"	-
 typedef	^	InputType	AeroConfig	TurbineComponents	-	-	-	"Current locations of components"
+typedef	^	InputType	DWM_InputType	DWM_Inputs	-	-	-		-
 typedef	^	InputType	ReKi	MulTabLoc	{:}{:}
 
 # ..... Outputs ...................................................................................................................
@@ -419,4 +430,5 @@ typedef	^	InputType	ReKi	MulTabLoc	{:}{:}
 typedef	^	OutputType	MeshType	OutputLoads	{:}	-	-	"Output Loads (mesh) for each blade"	-
 typedef	^	OutputType	MeshType	Twr_OutputLoads	-	-	-	"Tower Output Loads (mesh)"	-
 typedef	^	OutputType	IfW_OutputType	IfW_Outputs	-	-	-		-
+typedef	^	OutputType	DWM_OutputType	DWM_Outputs	-	-	-		-
 

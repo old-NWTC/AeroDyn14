@@ -15,7 +15,7 @@
 # Use ^ as a shortcut for the value in the same column from the previous line.
 ###################################################################################################################################
 include	Registry_NWTC_Library.txt
-usefrom	Reg-InflowWind.txt
+usefrom	InflowWind.txt
 
 # AeroDyn Subtypes
 typedef	AeroDyn/AD	Marker	Reki	Position	3	0.0	-		-
@@ -293,6 +293,7 @@ typedef	^	InitInputType	ReKi	BladeLength	-	-	-	"Blade Length"
 #typedef	^	InitInputType	PositionType	HubPos	-	-	-	"Positions of the blades, initially, from FAST"
 #typedef	^	InitInputType	OrientationType	InitBladeOrient	{:}{:}	-	-	"Positions of the blades, initially, from FAST"
 typedef	^	InitInputType	LOGICAL	LinearizeFlag
+typedef	^	InitInputType	LOGICAL	UseDWM	-	.FALSE.	-	"flag to determine if DWM module should be used"	-
 typedef	^	InitInputType	AeroConfig	TurbineComponents	-	-	-		-
 typedef	^	InitInputType	INTEGER	NumTwrNodes	-	-	-	"Number of ElastoDyn tower nodes.  Tower drag will be computed at those points."
 typedef	^	InitInputType	ReKi	TwrNodeLocs	{:}{:}	-	-	"Location of ElastoDyn tower nodes with respect to the inertial origin."	-
@@ -370,6 +371,7 @@ typedef	^	ParameterType	LOGICAL	MultiTab	-
 typedef	^	ParameterType	LOGICAL	LinearizeFlag
 typedef	^	ParameterType	LOGICAL	OutputPlottingInfo	-	.FALSE.
 typedef	^	ParameterType	LOGICAL	Initialized	-	.FALSE.	-		-
+typedef	^	ParameterType	LOGICAL	UseDWM	-	.FALSE.	-	"flag to determine if DWM module should be used"	-
 typedef	^	ParameterType	ReKi	TwoPiNB	-	-	-	"2*pi/num of blades"	-
 typedef	^	ParameterType	INTEGER	NumBl	-	-	-	"Number of Blades"
 typedef	^	ParameterType	INTEGER	NBlInpSt	-	-	-	"Number of Blade Input Stations"
@@ -405,7 +407,6 @@ typedef	^	ParameterType	IfW_ParameterType	IfW_Params	-	-	-		-
 # Define inputs that are contained on the mesh here:
 #typedef	^	InputType	MeshType	MeshedInput	-	-	-	"Meshed input data"	-
 # Define inputs that are not on this mesh here:
-#typedef	^	InputType	AllAeroMarkers	InputMarkers	-	-	-	"Input Forces and positions (mesh)"	-
 typedef	^	InputType	MeshType	InputMarkers	{:}	-	-	"Input Forces and positions for the blades (mesh) for each blade"	-
 typedef	^	InputType	MeshType	Twr_InputMarkers	-	-	-	"Input Forces and positions for the tower (mesh)"	-
 typedef	^	InputType	AeroConfig	TurbineComponents	-	-	-	"Current locations of components"
@@ -415,7 +416,6 @@ typedef	^	InputType	ReKi	MulTabLoc	{:}{:}
 # Define outputs that are contained on the mesh here:
 #typedef	^	OutputType	MeshType	MeshedOutput	-	-	-	"Meshed output data"	-
 # Define outputs that are not on this mesh here:
-#typedef	^	OutputType	AllAeroMarkers	OutputLoads	-	-	-	"Output Loads (mesh)"	-
 typedef	^	OutputType	MeshType	OutputLoads	{:}	-	-	"Output Loads (mesh) for each blade"	-
 typedef	^	OutputType	MeshType	Twr_OutputLoads	-	-	-	"Tower Output Loads (mesh)"	-
 typedef	^	OutputType	IfW_OutputType	IfW_Outputs	-	-	-		-

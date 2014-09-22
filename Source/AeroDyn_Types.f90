@@ -3,7 +3,7 @@
 ! WARNING This file is generated automatically by the FAST registry
 ! Do not edit.  Your changes to this file will be lost.
 !
-! FAST Registry (v2.03.01, 18-June-2014)
+! FAST Registry (v2.03.02, 17-Sept-2014)
 !*********************************************************************************************************************************
 ! AeroDyn_Types
 !.................................................................................................................................
@@ -347,6 +347,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: NumBl      ! Number of Blades [-]
     REAL(ReKi)  :: BladeLength      ! Blade Length [-]
     LOGICAL  :: LinearizeFlag 
+    LOGICAL  :: UseDWM = .FALSE.      ! flag to determine if DWM module should be used [-]
     TYPE(AeroConfig)  :: TurbineComponents 
     INTEGER(IntKi)  :: NumTwrNodes      ! Number of ElastoDyn tower nodes.  Tower drag will be computed at those points. [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: TwrNodeLocs      ! Location of ElastoDyn tower nodes with respect to the inertial origin. [-]
@@ -421,6 +422,7 @@ IMPLICIT NONE
     LOGICAL  :: LinearizeFlag 
     LOGICAL  :: OutputPlottingInfo = .FALSE. 
     LOGICAL  :: Initialized = .FALSE. 
+    LOGICAL  :: UseDWM = .FALSE.      ! flag to determine if DWM module should be used [-]
     REAL(ReKi)  :: TwoPiNB      ! 2*pi/num of blades [-]
     INTEGER(IntKi)  :: NumBl      ! Number of Blades [-]
     INTEGER(IntKi)  :: NBlInpSt      ! Number of Blade Input Stations [-]
@@ -6522,6 +6524,7 @@ ENDIF
    DstInitInputData%NumBl = SrcInitInputData%NumBl
    DstInitInputData%BladeLength = SrcInitInputData%BladeLength
    DstInitInputData%LinearizeFlag = SrcInitInputData%LinearizeFlag
+   DstInitInputData%UseDWM = SrcInitInputData%UseDWM
       CALL AD_Copyaeroconfig( SrcInitInputData%TurbineComponents, DstInitInputData%TurbineComponents, CtrlCode, ErrStat, ErrMsg )
    DstInitInputData%NumTwrNodes = SrcInitInputData%NumTwrNodes
 IF (ALLOCATED(SrcInitInputData%TwrNodeLocs)) THEN
@@ -8133,6 +8136,7 @@ ENDIF
    DstParamData%LinearizeFlag = SrcParamData%LinearizeFlag
    DstParamData%OutputPlottingInfo = SrcParamData%OutputPlottingInfo
    DstParamData%Initialized = SrcParamData%Initialized
+   DstParamData%UseDWM = SrcParamData%UseDWM
    DstParamData%TwoPiNB = SrcParamData%TwoPiNB
    DstParamData%NumBl = SrcParamData%NumBl
    DstParamData%NBlInpSt = SrcParamData%NBlInpSt

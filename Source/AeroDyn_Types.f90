@@ -345,7 +345,6 @@ IMPLICIT NONE
     CHARACTER(1024)  :: ADFileName      ! AeroDyn file name [-]
     CHARACTER(1024)  :: WindFileName      ! Inflow init file name [-]
     LOGICAL  :: WrSumFile      ! T/F: Write an AeroDyn summary [-]
-    LOGICAL  :: UseDWM = .FALSE. 
     INTEGER(IntKi)  :: NumBl      ! Number of Blades [-]
     REAL(ReKi)  :: BladeLength      ! Blade Length [-]
     LOGICAL  :: LinearizeFlag 
@@ -367,8 +366,8 @@ IMPLICIT NONE
 ! =========  AD_ContinuousStateType  =======
   TYPE, PUBLIC :: AD_ContinuousStateType
     REAL(ReKi)  :: DummyDiscState 
-    TYPE(IfW_ContinuousStateType)  :: IfW_ContStates 
     TYPE(DWM_ContinuousStateType)  :: DWM_ContStates 
+    TYPE(IfW_ContinuousStateType)  :: IfW_ContStates 
   END TYPE AD_ContinuousStateType
 ! =======================
 ! =========  AD_DiscreteStateType  =======
@@ -418,6 +417,7 @@ IMPLICIT NONE
     LOGICAL  :: Skew 
     LOGICAL  :: DynInit      ! FALSE=EQUIL, TRUE=DYNIN [-]
     TYPE(IfW_InputType)  :: IfW_Inputs      ! inputs to IfW module; set here so we don't have to recreate it every time [-]
+    TYPE(DWM_InputType)  :: DWM_Inputs 
   END TYPE AD_OtherStateType
 ! =======================
 ! =========  AD_ParameterType  =======
@@ -467,7 +467,6 @@ IMPLICIT NONE
     TYPE(MeshType) , DIMENSION(:), ALLOCATABLE  :: InputMarkers      ! Input Forces and positions for the blades (mesh) for each blade [-]
     TYPE(MeshType)  :: Twr_InputMarkers      ! Input Forces and positions for the tower (mesh) [-]
     TYPE(AeroConfig)  :: TurbineComponents      ! Current locations of components [-]
-    TYPE(DWM_InputType)  :: DWM_Inputs 
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: MulTabLoc 
   END TYPE AD_InputType
 ! =======================
@@ -6532,7 +6531,6 @@ ENDIF
    DstInitInputData%ADFileName = SrcInitInputData%ADFileName
    DstInitInputData%WindFileName = SrcInitInputData%WindFileName
    DstInitInputData%WrSumFile = SrcInitInputData%WrSumFile
-   DstInitInputData%UseDWM = SrcInitInputData%UseDWM
    DstInitInputData%NumBl = SrcInitInputData%NumBl
    DstInitInputData%BladeLength = SrcInitInputData%BladeLength
    DstInitInputData%LinearizeFlag = SrcInitInputData%LinearizeFlag
@@ -7063,8 +7061,8 @@ ENDIF
    ErrStat = ErrID_None
    ErrMsg  = ""
    DstContStateData%DummyDiscState = SrcContStateData%DummyDiscState
-      CALL IfW_CopyContState( SrcContStateData%IfW_ContStates, DstContStateData%IfW_ContStates, CtrlCode, ErrStat, ErrMsg )
       CALL DWM_CopyContState( SrcContStateData%DWM_ContStates, DstContStateData%DWM_ContStates, CtrlCode, ErrStat, ErrMsg )
+      CALL IfW_CopyContState( SrcContStateData%IfW_ContStates, DstContStateData%IfW_ContStates, CtrlCode, ErrStat, ErrMsg )
  END SUBROUTINE AD_CopyContState
 
  SUBROUTINE AD_DestroyContState( ContStateData, ErrStat, ErrMsg )
@@ -7075,8 +7073,8 @@ ENDIF
 ! 
   ErrStat = ErrID_None
   ErrMsg  = ""
-  CALL IfW_DestroyContState( ContStateData%IfW_ContStates, ErrStat, ErrMsg )
   CALL DWM_DestroyContState( ContStateData%DWM_ContStates, ErrStat, ErrMsg )
+  CALL IfW_DestroyContState( ContStateData%IfW_ContStates, ErrStat, ErrMsg )
  END SUBROUTINE AD_DestroyContState
 
  SUBROUTINE AD_PackContState( ReKiBuf, DbKiBuf, IntKiBuf, Indata, ErrStat, ErrMsg, SizeOnly )
@@ -7100,12 +7098,12 @@ ENDIF
   INTEGER(IntKi)                 :: i,i1,i2,i3,i4,i5     
   LOGICAL                        :: OnlySize ! if present and true, do not pack, just allocate buffers
  ! buffers to store meshes, if any
-  REAL(ReKi),     ALLOCATABLE :: Re_IfW_ContStates_Buf(:)
-  REAL(DbKi),     ALLOCATABLE :: Db_IfW_ContStates_Buf(:)
-  INTEGER(IntKi), ALLOCATABLE :: Int_IfW_ContStates_Buf(:)
   REAL(ReKi),     ALLOCATABLE :: Re_DWM_ContStates_Buf(:)
   REAL(DbKi),     ALLOCATABLE :: Db_DWM_ContStates_Buf(:)
   INTEGER(IntKi), ALLOCATABLE :: Int_DWM_ContStates_Buf(:)
+  REAL(ReKi),     ALLOCATABLE :: Re_IfW_ContStates_Buf(:)
+  REAL(DbKi),     ALLOCATABLE :: Db_IfW_ContStates_Buf(:)
+  INTEGER(IntKi), ALLOCATABLE :: Int_IfW_ContStates_Buf(:)
   OnlySize = .FALSE.
   IF ( PRESENT(SizeOnly) ) THEN
     OnlySize = SizeOnly
@@ -7120,13 +7118,6 @@ ENDIF
   Db_BufSz  = 0
   Int_BufSz  = 0
   Re_BufSz   = Re_BufSz   + 1  ! DummyDiscState
-  CALL IfW_PackContState( Re_IfW_ContStates_Buf, Db_IfW_ContStates_Buf, Int_IfW_ContStates_Buf, InData%IfW_ContStates, ErrStat, ErrMsg, .TRUE. ) ! IfW_ContStates 
-  IF(ALLOCATED(Re_IfW_ContStates_Buf)) Re_BufSz  = Re_BufSz  + SIZE( Re_IfW_ContStates_Buf  ) ! IfW_ContStates
-  IF(ALLOCATED(Db_IfW_ContStates_Buf)) Db_BufSz  = Db_BufSz  + SIZE( Db_IfW_ContStates_Buf  ) ! IfW_ContStates
-  IF(ALLOCATED(Int_IfW_ContStates_Buf))Int_BufSz = Int_BufSz + SIZE( Int_IfW_ContStates_Buf ) ! IfW_ContStates
-  IF(ALLOCATED(Re_IfW_ContStates_Buf))  DEALLOCATE(Re_IfW_ContStates_Buf)
-  IF(ALLOCATED(Db_IfW_ContStates_Buf))  DEALLOCATE(Db_IfW_ContStates_Buf)
-  IF(ALLOCATED(Int_IfW_ContStates_Buf)) DEALLOCATE(Int_IfW_ContStates_Buf)
   CALL DWM_PackContState( Re_DWM_ContStates_Buf, Db_DWM_ContStates_Buf, Int_DWM_ContStates_Buf, InData%DWM_ContStates, ErrStat, ErrMsg, .TRUE. ) ! DWM_ContStates 
   IF(ALLOCATED(Re_DWM_ContStates_Buf)) Re_BufSz  = Re_BufSz  + SIZE( Re_DWM_ContStates_Buf  ) ! DWM_ContStates
   IF(ALLOCATED(Db_DWM_ContStates_Buf)) Db_BufSz  = Db_BufSz  + SIZE( Db_DWM_ContStates_Buf  ) ! DWM_ContStates
@@ -7134,27 +7125,18 @@ ENDIF
   IF(ALLOCATED(Re_DWM_ContStates_Buf))  DEALLOCATE(Re_DWM_ContStates_Buf)
   IF(ALLOCATED(Db_DWM_ContStates_Buf))  DEALLOCATE(Db_DWM_ContStates_Buf)
   IF(ALLOCATED(Int_DWM_ContStates_Buf)) DEALLOCATE(Int_DWM_ContStates_Buf)
+  CALL IfW_PackContState( Re_IfW_ContStates_Buf, Db_IfW_ContStates_Buf, Int_IfW_ContStates_Buf, InData%IfW_ContStates, ErrStat, ErrMsg, .TRUE. ) ! IfW_ContStates 
+  IF(ALLOCATED(Re_IfW_ContStates_Buf)) Re_BufSz  = Re_BufSz  + SIZE( Re_IfW_ContStates_Buf  ) ! IfW_ContStates
+  IF(ALLOCATED(Db_IfW_ContStates_Buf)) Db_BufSz  = Db_BufSz  + SIZE( Db_IfW_ContStates_Buf  ) ! IfW_ContStates
+  IF(ALLOCATED(Int_IfW_ContStates_Buf))Int_BufSz = Int_BufSz + SIZE( Int_IfW_ContStates_Buf ) ! IfW_ContStates
+  IF(ALLOCATED(Re_IfW_ContStates_Buf))  DEALLOCATE(Re_IfW_ContStates_Buf)
+  IF(ALLOCATED(Db_IfW_ContStates_Buf))  DEALLOCATE(Db_IfW_ContStates_Buf)
+  IF(ALLOCATED(Int_IfW_ContStates_Buf)) DEALLOCATE(Int_IfW_ContStates_Buf)
   IF ( Re_BufSz  .GT. 0 ) ALLOCATE( ReKiBuf(  Re_BufSz  ) )
   IF ( Db_BufSz  .GT. 0 ) ALLOCATE( DbKiBuf(  Db_BufSz  ) )
   IF ( Int_BufSz .GT. 0 ) ALLOCATE( IntKiBuf( Int_BufSz ) )
   IF ( .NOT. OnlySize ) ReKiBuf ( Re_Xferred:Re_Xferred+(1)-1 ) =  (InData%DummyDiscState )
   Re_Xferred   = Re_Xferred   + 1
-  CALL IfW_PackContState( Re_IfW_ContStates_Buf, Db_IfW_ContStates_Buf, Int_IfW_ContStates_Buf, InData%IfW_ContStates, ErrStat, ErrMsg, OnlySize ) ! IfW_ContStates 
-  IF(ALLOCATED(Re_IfW_ContStates_Buf)) THEN
-    IF ( .NOT. OnlySize ) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_IfW_ContStates_Buf)-1 ) = Re_IfW_ContStates_Buf
-    Re_Xferred = Re_Xferred + SIZE(Re_IfW_ContStates_Buf)
-  ENDIF
-  IF(ALLOCATED(Db_IfW_ContStates_Buf)) THEN
-    IF ( .NOT. OnlySize ) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_IfW_ContStates_Buf)-1 ) = Db_IfW_ContStates_Buf
-    Db_Xferred = Db_Xferred + SIZE(Db_IfW_ContStates_Buf)
-  ENDIF
-  IF(ALLOCATED(Int_IfW_ContStates_Buf)) THEN
-    IF ( .NOT. OnlySize ) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_IfW_ContStates_Buf)-1 ) = Int_IfW_ContStates_Buf
-    Int_Xferred = Int_Xferred + SIZE(Int_IfW_ContStates_Buf)
-  ENDIF
-  IF( ALLOCATED(Re_IfW_ContStates_Buf) )  DEALLOCATE(Re_IfW_ContStates_Buf)
-  IF( ALLOCATED(Db_IfW_ContStates_Buf) )  DEALLOCATE(Db_IfW_ContStates_Buf)
-  IF( ALLOCATED(Int_IfW_ContStates_Buf) ) DEALLOCATE(Int_IfW_ContStates_Buf)
   CALL DWM_PackContState( Re_DWM_ContStates_Buf, Db_DWM_ContStates_Buf, Int_DWM_ContStates_Buf, InData%DWM_ContStates, ErrStat, ErrMsg, OnlySize ) ! DWM_ContStates 
   IF(ALLOCATED(Re_DWM_ContStates_Buf)) THEN
     IF ( .NOT. OnlySize ) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_DWM_ContStates_Buf)-1 ) = Re_DWM_ContStates_Buf
@@ -7171,6 +7153,22 @@ ENDIF
   IF( ALLOCATED(Re_DWM_ContStates_Buf) )  DEALLOCATE(Re_DWM_ContStates_Buf)
   IF( ALLOCATED(Db_DWM_ContStates_Buf) )  DEALLOCATE(Db_DWM_ContStates_Buf)
   IF( ALLOCATED(Int_DWM_ContStates_Buf) ) DEALLOCATE(Int_DWM_ContStates_Buf)
+  CALL IfW_PackContState( Re_IfW_ContStates_Buf, Db_IfW_ContStates_Buf, Int_IfW_ContStates_Buf, InData%IfW_ContStates, ErrStat, ErrMsg, OnlySize ) ! IfW_ContStates 
+  IF(ALLOCATED(Re_IfW_ContStates_Buf)) THEN
+    IF ( .NOT. OnlySize ) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_IfW_ContStates_Buf)-1 ) = Re_IfW_ContStates_Buf
+    Re_Xferred = Re_Xferred + SIZE(Re_IfW_ContStates_Buf)
+  ENDIF
+  IF(ALLOCATED(Db_IfW_ContStates_Buf)) THEN
+    IF ( .NOT. OnlySize ) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_IfW_ContStates_Buf)-1 ) = Db_IfW_ContStates_Buf
+    Db_Xferred = Db_Xferred + SIZE(Db_IfW_ContStates_Buf)
+  ENDIF
+  IF(ALLOCATED(Int_IfW_ContStates_Buf)) THEN
+    IF ( .NOT. OnlySize ) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_IfW_ContStates_Buf)-1 ) = Int_IfW_ContStates_Buf
+    Int_Xferred = Int_Xferred + SIZE(Int_IfW_ContStates_Buf)
+  ENDIF
+  IF( ALLOCATED(Re_IfW_ContStates_Buf) )  DEALLOCATE(Re_IfW_ContStates_Buf)
+  IF( ALLOCATED(Db_IfW_ContStates_Buf) )  DEALLOCATE(Db_IfW_ContStates_Buf)
+  IF( ALLOCATED(Int_IfW_ContStates_Buf) ) DEALLOCATE(Int_IfW_ContStates_Buf)
  END SUBROUTINE AD_PackContState
 
  SUBROUTINE AD_UnPackContState( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -7197,12 +7195,12 @@ ENDIF
   LOGICAL, ALLOCATABLE           :: mask4(:,:,:,:)
   LOGICAL, ALLOCATABLE           :: mask5(:,:,:,:,:)
  ! buffers to store meshes, if any
-  REAL(ReKi),    ALLOCATABLE :: Re_IfW_ContStates_Buf(:)
-  REAL(DbKi),    ALLOCATABLE :: Db_IfW_ContStates_Buf(:)
-  INTEGER(IntKi),    ALLOCATABLE :: Int_IfW_ContStates_Buf(:)
   REAL(ReKi),    ALLOCATABLE :: Re_DWM_ContStates_Buf(:)
   REAL(DbKi),    ALLOCATABLE :: Db_DWM_ContStates_Buf(:)
   INTEGER(IntKi),    ALLOCATABLE :: Int_DWM_ContStates_Buf(:)
+  REAL(ReKi),    ALLOCATABLE :: Re_IfW_ContStates_Buf(:)
+  REAL(DbKi),    ALLOCATABLE :: Db_IfW_ContStates_Buf(:)
+  INTEGER(IntKi),    ALLOCATABLE :: Int_IfW_ContStates_Buf(:)
     !
   ErrStat = ErrID_None
   ErrMsg  = ""
@@ -7214,21 +7212,6 @@ ENDIF
   Int_BufSz  = 0
   OutData%DummyDiscState = ReKiBuf ( Re_Xferred )
   Re_Xferred   = Re_Xferred   + 1
- ! first call IfW_PackContState to get correctly sized buffers for unpacking
-  CALL IfW_PackContState( Re_IfW_ContStates_Buf, Db_IfW_ContStates_Buf, Int_IfW_ContStates_Buf, OutData%IfW_ContStates, ErrStat, ErrMsg, .TRUE. ) ! IfW_ContStates 
-  IF(ALLOCATED(Re_IfW_ContStates_Buf)) THEN
-    Re_IfW_ContStates_Buf = ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_IfW_ContStates_Buf)-1 )
-    Re_Xferred = Re_Xferred + SIZE(Re_IfW_ContStates_Buf)
-  ENDIF
-  IF(ALLOCATED(Db_IfW_ContStates_Buf)) THEN
-    Db_IfW_ContStates_Buf = DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_IfW_ContStates_Buf)-1 )
-    Db_Xferred = Db_Xferred + SIZE(Db_IfW_ContStates_Buf)
-  ENDIF
-  IF(ALLOCATED(Int_IfW_ContStates_Buf)) THEN
-    Int_IfW_ContStates_Buf = IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_IfW_ContStates_Buf)-1 )
-    Int_Xferred = Int_Xferred + SIZE(Int_IfW_ContStates_Buf)
-  ENDIF
-  CALL IfW_UnPackContState( Re_IfW_ContStates_Buf, Db_IfW_ContStates_Buf, Int_IfW_ContStates_Buf, OutData%IfW_ContStates, ErrStat, ErrMsg ) ! IfW_ContStates 
  ! first call DWM_PackContState to get correctly sized buffers for unpacking
   CALL DWM_PackContState( Re_DWM_ContStates_Buf, Db_DWM_ContStates_Buf, Int_DWM_ContStates_Buf, OutData%DWM_ContStates, ErrStat, ErrMsg, .TRUE. ) ! DWM_ContStates 
   IF(ALLOCATED(Re_DWM_ContStates_Buf)) THEN
@@ -7244,6 +7227,21 @@ ENDIF
     Int_Xferred = Int_Xferred + SIZE(Int_DWM_ContStates_Buf)
   ENDIF
   CALL DWM_UnPackContState( Re_DWM_ContStates_Buf, Db_DWM_ContStates_Buf, Int_DWM_ContStates_Buf, OutData%DWM_ContStates, ErrStat, ErrMsg ) ! DWM_ContStates 
+ ! first call IfW_PackContState to get correctly sized buffers for unpacking
+  CALL IfW_PackContState( Re_IfW_ContStates_Buf, Db_IfW_ContStates_Buf, Int_IfW_ContStates_Buf, OutData%IfW_ContStates, ErrStat, ErrMsg, .TRUE. ) ! IfW_ContStates 
+  IF(ALLOCATED(Re_IfW_ContStates_Buf)) THEN
+    Re_IfW_ContStates_Buf = ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_IfW_ContStates_Buf)-1 )
+    Re_Xferred = Re_Xferred + SIZE(Re_IfW_ContStates_Buf)
+  ENDIF
+  IF(ALLOCATED(Db_IfW_ContStates_Buf)) THEN
+    Db_IfW_ContStates_Buf = DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_IfW_ContStates_Buf)-1 )
+    Db_Xferred = Db_Xferred + SIZE(Db_IfW_ContStates_Buf)
+  ENDIF
+  IF(ALLOCATED(Int_IfW_ContStates_Buf)) THEN
+    Int_IfW_ContStates_Buf = IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_IfW_ContStates_Buf)-1 )
+    Int_Xferred = Int_Xferred + SIZE(Int_IfW_ContStates_Buf)
+  ENDIF
+  CALL IfW_UnPackContState( Re_IfW_ContStates_Buf, Db_IfW_ContStates_Buf, Int_IfW_ContStates_Buf, OutData%IfW_ContStates, ErrStat, ErrMsg ) ! IfW_ContStates 
   Re_Xferred   = Re_Xferred-1
   Db_Xferred   = Db_Xferred-1
   Int_Xferred  = Int_Xferred-1
@@ -7737,6 +7735,7 @@ ENDIF
    DstOtherStateData%Skew = SrcOtherStateData%Skew
    DstOtherStateData%DynInit = SrcOtherStateData%DynInit
       CALL IfW_CopyInput( SrcOtherStateData%IfW_Inputs, DstOtherStateData%IfW_Inputs, CtrlCode, ErrStat, ErrMsg )
+      CALL DWM_CopyInput( SrcOtherStateData%DWM_Inputs, DstOtherStateData%DWM_Inputs, CtrlCode, ErrStat, ErrMsg )
  END SUBROUTINE AD_CopyOtherState
 
  SUBROUTINE AD_DestroyOtherState( OtherStateData, ErrStat, ErrMsg )
@@ -7767,6 +7766,7 @@ IF (ALLOCATED(OtherStateData%StoredMoments)) THEN
 ENDIF
   CALL AD_Destroyeloutparms( OtherStateData%ElOut, ErrStat, ErrMsg )
   CALL IfW_DestroyInput( OtherStateData%IfW_Inputs, ErrStat, ErrMsg )
+  CALL DWM_DestroyInput( OtherStateData%DWM_Inputs, ErrStat, ErrMsg )
  END SUBROUTINE AD_DestroyOtherState
 
  SUBROUTINE AD_PackOtherState( ReKiBuf, DbKiBuf, IntKiBuf, Indata, ErrStat, ErrMsg, SizeOnly )
@@ -7823,6 +7823,9 @@ ENDIF
   REAL(ReKi),     ALLOCATABLE :: Re_IfW_Inputs_Buf(:)
   REAL(DbKi),     ALLOCATABLE :: Db_IfW_Inputs_Buf(:)
   INTEGER(IntKi), ALLOCATABLE :: Int_IfW_Inputs_Buf(:)
+  REAL(ReKi),     ALLOCATABLE :: Re_DWM_Inputs_Buf(:)
+  REAL(DbKi),     ALLOCATABLE :: Db_DWM_Inputs_Buf(:)
+  INTEGER(IntKi), ALLOCATABLE :: Int_DWM_Inputs_Buf(:)
   OnlySize = .FALSE.
   IF ( PRESENT(SizeOnly) ) THEN
     OnlySize = SizeOnly
@@ -7924,6 +7927,13 @@ ENDIF
   IF(ALLOCATED(Re_IfW_Inputs_Buf))  DEALLOCATE(Re_IfW_Inputs_Buf)
   IF(ALLOCATED(Db_IfW_Inputs_Buf))  DEALLOCATE(Db_IfW_Inputs_Buf)
   IF(ALLOCATED(Int_IfW_Inputs_Buf)) DEALLOCATE(Int_IfW_Inputs_Buf)
+  CALL DWM_PackInput( Re_DWM_Inputs_Buf, Db_DWM_Inputs_Buf, Int_DWM_Inputs_Buf, InData%DWM_Inputs, ErrStat, ErrMsg, .TRUE. ) ! DWM_Inputs 
+  IF(ALLOCATED(Re_DWM_Inputs_Buf)) Re_BufSz  = Re_BufSz  + SIZE( Re_DWM_Inputs_Buf  ) ! DWM_Inputs
+  IF(ALLOCATED(Db_DWM_Inputs_Buf)) Db_BufSz  = Db_BufSz  + SIZE( Db_DWM_Inputs_Buf  ) ! DWM_Inputs
+  IF(ALLOCATED(Int_DWM_Inputs_Buf))Int_BufSz = Int_BufSz + SIZE( Int_DWM_Inputs_Buf ) ! DWM_Inputs
+  IF(ALLOCATED(Re_DWM_Inputs_Buf))  DEALLOCATE(Re_DWM_Inputs_Buf)
+  IF(ALLOCATED(Db_DWM_Inputs_Buf))  DEALLOCATE(Db_DWM_Inputs_Buf)
+  IF(ALLOCATED(Int_DWM_Inputs_Buf)) DEALLOCATE(Int_DWM_Inputs_Buf)
   IF ( Re_BufSz  .GT. 0 ) ALLOCATE( ReKiBuf(  Re_BufSz  ) )
   IF ( Db_BufSz  .GT. 0 ) ALLOCATE( DbKiBuf(  Db_BufSz  ) )
   IF ( Int_BufSz .GT. 0 ) ALLOCATE( IntKiBuf( Int_BufSz ) )
@@ -8131,6 +8141,22 @@ ENDIF
   IF( ALLOCATED(Re_IfW_Inputs_Buf) )  DEALLOCATE(Re_IfW_Inputs_Buf)
   IF( ALLOCATED(Db_IfW_Inputs_Buf) )  DEALLOCATE(Db_IfW_Inputs_Buf)
   IF( ALLOCATED(Int_IfW_Inputs_Buf) ) DEALLOCATE(Int_IfW_Inputs_Buf)
+  CALL DWM_PackInput( Re_DWM_Inputs_Buf, Db_DWM_Inputs_Buf, Int_DWM_Inputs_Buf, InData%DWM_Inputs, ErrStat, ErrMsg, OnlySize ) ! DWM_Inputs 
+  IF(ALLOCATED(Re_DWM_Inputs_Buf)) THEN
+    IF ( .NOT. OnlySize ) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_DWM_Inputs_Buf)-1 ) = Re_DWM_Inputs_Buf
+    Re_Xferred = Re_Xferred + SIZE(Re_DWM_Inputs_Buf)
+  ENDIF
+  IF(ALLOCATED(Db_DWM_Inputs_Buf)) THEN
+    IF ( .NOT. OnlySize ) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_DWM_Inputs_Buf)-1 ) = Db_DWM_Inputs_Buf
+    Db_Xferred = Db_Xferred + SIZE(Db_DWM_Inputs_Buf)
+  ENDIF
+  IF(ALLOCATED(Int_DWM_Inputs_Buf)) THEN
+    IF ( .NOT. OnlySize ) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_DWM_Inputs_Buf)-1 ) = Int_DWM_Inputs_Buf
+    Int_Xferred = Int_Xferred + SIZE(Int_DWM_Inputs_Buf)
+  ENDIF
+  IF( ALLOCATED(Re_DWM_Inputs_Buf) )  DEALLOCATE(Re_DWM_Inputs_Buf)
+  IF( ALLOCATED(Db_DWM_Inputs_Buf) )  DEALLOCATE(Db_DWM_Inputs_Buf)
+  IF( ALLOCATED(Int_DWM_Inputs_Buf) ) DEALLOCATE(Int_DWM_Inputs_Buf)
  END SUBROUTINE AD_PackOtherState
 
  SUBROUTINE AD_UnPackOtherState( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -8190,6 +8216,9 @@ ENDIF
   REAL(ReKi),    ALLOCATABLE :: Re_IfW_Inputs_Buf(:)
   REAL(DbKi),    ALLOCATABLE :: Db_IfW_Inputs_Buf(:)
   INTEGER(IntKi),    ALLOCATABLE :: Int_IfW_Inputs_Buf(:)
+  REAL(ReKi),    ALLOCATABLE :: Re_DWM_Inputs_Buf(:)
+  REAL(DbKi),    ALLOCATABLE :: Db_DWM_Inputs_Buf(:)
+  INTEGER(IntKi),    ALLOCATABLE :: Int_DWM_Inputs_Buf(:)
     !
   ErrStat = ErrID_None
   ErrMsg  = ""
@@ -8398,6 +8427,21 @@ ENDIF
     Int_Xferred = Int_Xferred + SIZE(Int_IfW_Inputs_Buf)
   ENDIF
   CALL IfW_UnPackInput( Re_IfW_Inputs_Buf, Db_IfW_Inputs_Buf, Int_IfW_Inputs_Buf, OutData%IfW_Inputs, ErrStat, ErrMsg ) ! IfW_Inputs 
+ ! first call DWM_PackInput to get correctly sized buffers for unpacking
+  CALL DWM_PackInput( Re_DWM_Inputs_Buf, Db_DWM_Inputs_Buf, Int_DWM_Inputs_Buf, OutData%DWM_Inputs, ErrStat, ErrMsg, .TRUE. ) ! DWM_Inputs 
+  IF(ALLOCATED(Re_DWM_Inputs_Buf)) THEN
+    Re_DWM_Inputs_Buf = ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_DWM_Inputs_Buf)-1 )
+    Re_Xferred = Re_Xferred + SIZE(Re_DWM_Inputs_Buf)
+  ENDIF
+  IF(ALLOCATED(Db_DWM_Inputs_Buf)) THEN
+    Db_DWM_Inputs_Buf = DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_DWM_Inputs_Buf)-1 )
+    Db_Xferred = Db_Xferred + SIZE(Db_DWM_Inputs_Buf)
+  ENDIF
+  IF(ALLOCATED(Int_DWM_Inputs_Buf)) THEN
+    Int_DWM_Inputs_Buf = IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_DWM_Inputs_Buf)-1 )
+    Int_Xferred = Int_Xferred + SIZE(Int_DWM_Inputs_Buf)
+  ENDIF
+  CALL DWM_UnPackInput( Re_DWM_Inputs_Buf, Db_DWM_Inputs_Buf, Int_DWM_Inputs_Buf, OutData%DWM_Inputs, ErrStat, ErrMsg ) ! DWM_Inputs 
   Re_Xferred   = Re_Xferred-1
   Db_Xferred   = Db_Xferred-1
   Int_Xferred  = Int_Xferred-1
@@ -9118,7 +9162,6 @@ IF (ALLOCATED(SrcInputData%InputMarkers)) THEN
 ENDIF
      CALL MeshCopy( SrcInputData%Twr_InputMarkers, DstInputData%Twr_InputMarkers, CtrlCode, ErrStat, ErrMsg )
       CALL AD_Copyaeroconfig( SrcInputData%TurbineComponents, DstInputData%TurbineComponents, CtrlCode, ErrStat, ErrMsg )
-      CALL DWM_CopyInput( SrcInputData%DWM_Inputs, DstInputData%DWM_Inputs, CtrlCode, ErrStat, ErrMsg )
 IF (ALLOCATED(SrcInputData%MulTabLoc)) THEN
    i1_l = LBOUND(SrcInputData%MulTabLoc,1)
    i1_u = UBOUND(SrcInputData%MulTabLoc,1)
@@ -9152,7 +9195,6 @@ ENDDO
 ENDIF
   CALL MeshDestroy( InputData%Twr_InputMarkers, ErrStat, ErrMsg )
   CALL AD_Destroyaeroconfig( InputData%TurbineComponents, ErrStat, ErrMsg )
-  CALL DWM_DestroyInput( InputData%DWM_Inputs, ErrStat, ErrMsg )
 IF (ALLOCATED(InputData%MulTabLoc)) THEN
    DEALLOCATE(InputData%MulTabLoc)
 ENDIF
@@ -9188,9 +9230,6 @@ ENDIF
   REAL(ReKi),     ALLOCATABLE :: Re_TurbineComponents_Buf(:)
   REAL(DbKi),     ALLOCATABLE :: Db_TurbineComponents_Buf(:)
   INTEGER(IntKi), ALLOCATABLE :: Int_TurbineComponents_Buf(:)
-  REAL(ReKi),     ALLOCATABLE :: Re_DWM_Inputs_Buf(:)
-  REAL(DbKi),     ALLOCATABLE :: Db_DWM_Inputs_Buf(:)
-  INTEGER(IntKi), ALLOCATABLE :: Int_DWM_Inputs_Buf(:)
   OnlySize = .FALSE.
   IF ( PRESENT(SizeOnly) ) THEN
     OnlySize = SizeOnly
@@ -9228,13 +9267,6 @@ ENDDO
   IF(ALLOCATED(Re_TurbineComponents_Buf))  DEALLOCATE(Re_TurbineComponents_Buf)
   IF(ALLOCATED(Db_TurbineComponents_Buf))  DEALLOCATE(Db_TurbineComponents_Buf)
   IF(ALLOCATED(Int_TurbineComponents_Buf)) DEALLOCATE(Int_TurbineComponents_Buf)
-  CALL DWM_PackInput( Re_DWM_Inputs_Buf, Db_DWM_Inputs_Buf, Int_DWM_Inputs_Buf, InData%DWM_Inputs, ErrStat, ErrMsg, .TRUE. ) ! DWM_Inputs 
-  IF(ALLOCATED(Re_DWM_Inputs_Buf)) Re_BufSz  = Re_BufSz  + SIZE( Re_DWM_Inputs_Buf  ) ! DWM_Inputs
-  IF(ALLOCATED(Db_DWM_Inputs_Buf)) Db_BufSz  = Db_BufSz  + SIZE( Db_DWM_Inputs_Buf  ) ! DWM_Inputs
-  IF(ALLOCATED(Int_DWM_Inputs_Buf))Int_BufSz = Int_BufSz + SIZE( Int_DWM_Inputs_Buf ) ! DWM_Inputs
-  IF(ALLOCATED(Re_DWM_Inputs_Buf))  DEALLOCATE(Re_DWM_Inputs_Buf)
-  IF(ALLOCATED(Db_DWM_Inputs_Buf))  DEALLOCATE(Db_DWM_Inputs_Buf)
-  IF(ALLOCATED(Int_DWM_Inputs_Buf)) DEALLOCATE(Int_DWM_Inputs_Buf)
   Re_BufSz    = Re_BufSz    + SIZE( InData%MulTabLoc )  ! MulTabLoc 
   IF ( Re_BufSz  .GT. 0 ) ALLOCATE( ReKiBuf(  Re_BufSz  ) )
   IF ( Db_BufSz  .GT. 0 ) ALLOCATE( DbKiBuf(  Db_BufSz  ) )
@@ -9289,22 +9321,6 @@ ENDDO
   IF( ALLOCATED(Re_TurbineComponents_Buf) )  DEALLOCATE(Re_TurbineComponents_Buf)
   IF( ALLOCATED(Db_TurbineComponents_Buf) )  DEALLOCATE(Db_TurbineComponents_Buf)
   IF( ALLOCATED(Int_TurbineComponents_Buf) ) DEALLOCATE(Int_TurbineComponents_Buf)
-  CALL DWM_PackInput( Re_DWM_Inputs_Buf, Db_DWM_Inputs_Buf, Int_DWM_Inputs_Buf, InData%DWM_Inputs, ErrStat, ErrMsg, OnlySize ) ! DWM_Inputs 
-  IF(ALLOCATED(Re_DWM_Inputs_Buf)) THEN
-    IF ( .NOT. OnlySize ) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_DWM_Inputs_Buf)-1 ) = Re_DWM_Inputs_Buf
-    Re_Xferred = Re_Xferred + SIZE(Re_DWM_Inputs_Buf)
-  ENDIF
-  IF(ALLOCATED(Db_DWM_Inputs_Buf)) THEN
-    IF ( .NOT. OnlySize ) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_DWM_Inputs_Buf)-1 ) = Db_DWM_Inputs_Buf
-    Db_Xferred = Db_Xferred + SIZE(Db_DWM_Inputs_Buf)
-  ENDIF
-  IF(ALLOCATED(Int_DWM_Inputs_Buf)) THEN
-    IF ( .NOT. OnlySize ) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_DWM_Inputs_Buf)-1 ) = Int_DWM_Inputs_Buf
-    Int_Xferred = Int_Xferred + SIZE(Int_DWM_Inputs_Buf)
-  ENDIF
-  IF( ALLOCATED(Re_DWM_Inputs_Buf) )  DEALLOCATE(Re_DWM_Inputs_Buf)
-  IF( ALLOCATED(Db_DWM_Inputs_Buf) )  DEALLOCATE(Db_DWM_Inputs_Buf)
-  IF( ALLOCATED(Int_DWM_Inputs_Buf) ) DEALLOCATE(Int_DWM_Inputs_Buf)
   IF ( ALLOCATED(InData%MulTabLoc) ) THEN
     IF ( .NOT. OnlySize ) ReKiBuf ( Re_Xferred:Re_Xferred+(SIZE(InData%MulTabLoc))-1 ) =  PACK(InData%MulTabLoc ,.TRUE.)
     Re_Xferred   = Re_Xferred   + SIZE(InData%MulTabLoc)
@@ -9344,9 +9360,6 @@ ENDDO
   REAL(ReKi),    ALLOCATABLE :: Re_TurbineComponents_Buf(:)
   REAL(DbKi),    ALLOCATABLE :: Db_TurbineComponents_Buf(:)
   INTEGER(IntKi),    ALLOCATABLE :: Int_TurbineComponents_Buf(:)
-  REAL(ReKi),    ALLOCATABLE :: Re_DWM_Inputs_Buf(:)
-  REAL(DbKi),    ALLOCATABLE :: Db_DWM_Inputs_Buf(:)
-  INTEGER(IntKi),    ALLOCATABLE :: Int_DWM_Inputs_Buf(:)
     !
   ErrStat = ErrID_None
   ErrMsg  = ""
@@ -9408,21 +9421,6 @@ ENDDO
     Int_Xferred = Int_Xferred + SIZE(Int_TurbineComponents_Buf)
   ENDIF
   CALL AD_UnPackaeroconfig( Re_TurbineComponents_Buf, Db_TurbineComponents_Buf, Int_TurbineComponents_Buf, OutData%TurbineComponents, ErrStat, ErrMsg ) ! TurbineComponents 
- ! first call DWM_PackInput to get correctly sized buffers for unpacking
-  CALL DWM_PackInput( Re_DWM_Inputs_Buf, Db_DWM_Inputs_Buf, Int_DWM_Inputs_Buf, OutData%DWM_Inputs, ErrStat, ErrMsg, .TRUE. ) ! DWM_Inputs 
-  IF(ALLOCATED(Re_DWM_Inputs_Buf)) THEN
-    Re_DWM_Inputs_Buf = ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_DWM_Inputs_Buf)-1 )
-    Re_Xferred = Re_Xferred + SIZE(Re_DWM_Inputs_Buf)
-  ENDIF
-  IF(ALLOCATED(Db_DWM_Inputs_Buf)) THEN
-    Db_DWM_Inputs_Buf = DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_DWM_Inputs_Buf)-1 )
-    Db_Xferred = Db_Xferred + SIZE(Db_DWM_Inputs_Buf)
-  ENDIF
-  IF(ALLOCATED(Int_DWM_Inputs_Buf)) THEN
-    Int_DWM_Inputs_Buf = IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_DWM_Inputs_Buf)-1 )
-    Int_Xferred = Int_Xferred + SIZE(Int_DWM_Inputs_Buf)
-  ENDIF
-  CALL DWM_UnPackInput( Re_DWM_Inputs_Buf, Db_DWM_Inputs_Buf, Int_DWM_Inputs_Buf, OutData%DWM_Inputs, ErrStat, ErrMsg ) ! DWM_Inputs 
   IF ( ALLOCATED(OutData%MulTabLoc) ) THEN
   ALLOCATE(mask2(SIZE(OutData%MulTabLoc,1),SIZE(OutData%MulTabLoc,2))); mask2 = .TRUE.
     OutData%MulTabLoc = UNPACK(ReKiBuf( Re_Xferred:Re_Xferred+(SIZE(OutData%MulTabLoc))-1 ),mask2,OutData%MulTabLoc)
@@ -9909,7 +9907,6 @@ END IF ! check if allocated
   u_out%TurbineComponents%Foundation%TranslationVel = u(1)%TurbineComponents%Foundation%TranslationVel
   u_out%TurbineComponents%Foundation%RotationVel = u(1)%TurbineComponents%Foundation%RotationVel
   u_out%TurbineComponents%BladeLength = u(1)%TurbineComponents%BladeLength
-      CALL DWM_Input_ExtrapInterp( u%DWM_Inputs, tin, u_out%DWM_Inputs, tin_out, ErrStat, ErrMsg )
 IF (ALLOCATED(u_out%MulTabLoc) .AND. ALLOCATED(u(1)%MulTabLoc)) THEN
   u_out%MulTabLoc = u(1)%MulTabLoc
 END IF ! check if allocated
@@ -10129,7 +10126,6 @@ END IF ! check if allocated
   DEALLOCATE(c1)
   b0 = -(u(1)%TurbineComponents%BladeLength - u(2)%TurbineComponents%BladeLength)/t(2)
   u_out%TurbineComponents%BladeLength = u(1)%TurbineComponents%BladeLength + b0 * t_out
-      CALL DWM_Input_ExtrapInterp( u%DWM_Inputs, tin, u_out%DWM_Inputs, tin_out, ErrStat, ErrMsg )
 IF (ALLOCATED(u_out%MulTabLoc) .AND. ALLOCATED(u(1)%MulTabLoc)) THEN
   ALLOCATE(b2(SIZE(u_out%MulTabLoc,1),SIZE(u_out%MulTabLoc,2) ))
   ALLOCATE(c2(SIZE(u_out%MulTabLoc,1),SIZE(u_out%MulTabLoc,2) ))
@@ -10397,7 +10393,6 @@ END IF ! check if allocated
   b0 = (t(3)**2*(u(1)%TurbineComponents%BladeLength - u(2)%TurbineComponents%BladeLength) + t(2)**2*(-u(1)%TurbineComponents%BladeLength + u(3)%TurbineComponents%BladeLength))/(t(2)*t(3)*(t(2) - t(3)))
   c0 = ( (t(2)-t(3))*u(1)%TurbineComponents%BladeLength + t(3)*u(2)%TurbineComponents%BladeLength - t(2)*u(3)%TurbineComponents%BladeLength ) / (t(2)*t(3)*(t(2) - t(3)))
   u_out%TurbineComponents%BladeLength = u(1)%TurbineComponents%BladeLength + b0 * t_out + c0 * t_out**2
-      CALL DWM_Input_ExtrapInterp( u%DWM_Inputs, tin, u_out%DWM_Inputs, tin_out, ErrStat, ErrMsg )
 IF (ALLOCATED(u_out%MulTabLoc) .AND. ALLOCATED(u(1)%MulTabLoc)) THEN
   ALLOCATE(b2(SIZE(u_out%MulTabLoc,1),SIZE(u_out%MulTabLoc,2) ))
   ALLOCATE(c2(SIZE(u_out%MulTabLoc,1),SIZE(u_out%MulTabLoc,2) ))

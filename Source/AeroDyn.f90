@@ -459,7 +459,7 @@ SUBROUTINE AD_Init( InitInp, u, p, x, xd, z, O, y, Interval, InitOut, ErrStat, E
       o%DWM_otherstates%blade_dr(:) = p%Blade%DR(:)
       p%DWM_Params%ElementRad(:)    = p%Element%RELM(:)   
    
-      CALL DWM_Init( InitInp%DWM_InitInputs, u%DWM_Inputs, p%DWM_Params, x%DWM_ContStates, xd%DWM_DiscStates, z%DWM_ConstrStates, & 
+      CALL DWM_Init( InitInp%DWM_InitInputs, O%DWM_Inputs, p%DWM_Params, x%DWM_ContStates, xd%DWM_DiscStates, z%DWM_ConstrStates, & 
                      O%DWM_OtherStates, y%DWM_Outputs, Interval, InitOut%DWM_InitOutput, ErrStatLcl, ErrMessLcl )
    
 
@@ -684,7 +684,7 @@ SUBROUTINE AD_End( u, p, x, xd, z, OtherState, y, ErrStat, ErrMess )
       IF (p%UseDWM ) THEN
          !----- Call the DWM ------- 
       
-         CALL DWM_End( u%DWM_Inputs, p%DWM_Params, x%DWM_ContStates, xd%DWM_DiscStates, z%DWM_ConstrStates, &
+         CALL DWM_End( OtherState%DWM_Inputs, p%DWM_Params, x%DWM_ContStates, xd%DWM_DiscStates, z%DWM_ConstrStates, &
                                            OtherState%DWM_OtherStates, y%DWM_Outputs, ErrStat, ErrMess )
       END IF ! UseDWM
       
@@ -1015,7 +1015,7 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
          !-------------------------------------------------------------------------------------------
          IF (p%UseDWM) THEN
             !bjj: FIX THIS!!!!         
-            !bjj: where do u%DWM_Inputs%RTPD%SimulationOrder_index and u%DWM_Inputs%RTPD%upwindturbine_number get set?
+            !bjj: where do p%DWM_Params%RTPD%SimulationOrder_index and p%DWM_Params%RTPD%upwindturbine_number get set?
          
             IF ( p%DWM_Params%RTPD%SimulationOrder_index > 1) THEN
                IF(  p%DWM_Params%RTPD%upwindturbine_number /= 0 ) THEN
@@ -1029,7 +1029,7 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
                   DO I = 1,p%DWM_Params%RTPD%upwindturbine_number
                      o%DWM_otherstates%DWM_tb%Aerodyn_turbine_num = I
                  
-                     CALL   DWM_phase1( Time, u%DWM_Inputs, p%DWM_Params, x%DWM_contstates, xd%DWM_discstates, z%DWM_constrstates, &
+                     CALL   DWM_phase1( Time, O%DWM_Inputs, p%DWM_Params, x%DWM_contstates, xd%DWM_discstates, z%DWM_constrstates, &
                                            o%DWM_otherstates, y%DWM_outputs, ErrStatLcl, ErrMessLcl )
                  
                      CALL SetErrStat ( ErrStatLcl, ErrMessLcl, ErrStat,ErrMess,' AD_CalcOutput/DWM_phase1' )
@@ -1043,7 +1043,7 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
               
                   o%DWM_otherstates%velocity_wake_mean    = o%DWM_otherstates%velocity_wake_mean * p%DWM_Params%Wind_file_Mean_u
               
-                  VelocityVec(1) = (VelocityVec(1) - p%DWM_Params%Wind_file_Mean_u)*(u%DWM_Inputs%Upwind_result%upwind_small_TI(I)/p%DWM_Params%TI_amb) &
+                  VelocityVec(1) = (VelocityVec(1) - p%DWM_Params%Wind_file_Mean_u)*(O%DWM_Inputs%Upwind_result%upwind_small_TI(I)/p%DWM_Params%TI_amb) &
                                   + o%DWM_otherstates%velocity_wake_mean
               
                END IF
@@ -1057,7 +1057,7 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
                o%DWM_otherstates%DWM_tb%Blade_index   = IBlade
                o%DWM_otherstates%DWM_tb%Element_index = IElement    
 
-               CALL   DWM_phase2( Time, u%DWM_Inputs, p%DWM_Params, x%DWM_contstates, xd%DWM_discstates, z%DWM_constrstates, &
+               CALL   DWM_phase2( Time, O%DWM_Inputs, p%DWM_Params, x%DWM_contstates, xd%DWM_discstates, z%DWM_constrstates, &
                                            o%DWM_otherstates, y%DWM_outputs, ErrStatLcl, ErrMessLcl )
             
                      CALL SetErrStat ( ErrStatLcl, ErrMessLcl, ErrStat,ErrMess,' AD_CalcOutput/DWM_phase1' )
@@ -1171,7 +1171,7 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
       IF (Time > 50.00 ) THEN !BJJ: why is 50 hard-coded here and above???
             
          o%DWM_otherstates%Nforce(:,:)    = o%StoredForces(1,:,:) 
-         CALL   DWM_phase3( Time, u%DWM_Inputs, p%DWM_Params, x%DWM_contstates, xd%DWM_discstates, z%DWM_constrstates, &
+         CALL   DWM_phase3( Time, O%DWM_Inputs, p%DWM_Params, x%DWM_contstates, xd%DWM_discstates, z%DWM_constrstates, &
                                 o%DWM_otherstates, y%DWM_outputs, ErrStatLcl, ErrMessLcl )
     
             CALL SetErrStat ( ErrStatLcl, ErrMessLcl, ErrStat,ErrMess,' AD_CalcOutput/DWM_phase3' )

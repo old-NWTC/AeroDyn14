@@ -309,8 +309,8 @@ typedef	^	InitOutputType	DWM_InitOutputType	DWM_InitOutput	-	-	-		-
 # ..... States ....................................................................................................................
 # Define continuous (differentiable) states here:
 typedef	^	ContinuousStateType	ReKi	DummyDiscState	-	-	-		-
-typedef	^	ContinuousStateType	DWM_ContinuousStateType	DWM_ContStates	-	-	-		-
 typedef	^	ContinuousStateType	IfW_ContinuousStateType	IfW_ContStates	-	-	-		-
+typedef	^	ContinuousStateType	DWM_ContinuousStateType	DWM_ContStates	-	-	-		-
 
 # Define discrete (nondifferentiable) states here:
 typedef	^	DiscreteStateType	ReKi	DummyDiscState	-	-	-		-

@@ -1305,7 +1305,7 @@ SUBROUTINE AD_CalcContStateDeriv( Time, u, p, x, xd, z, OtherState, dxdt, ErrSta
 
          ! Compute the first time derivatives of the continuous states here:
 
-     dxdt%DummyDiscState = 0.
+!     dxdt%DummyDiscState = 0.
 
 
 END SUBROUTINE AD_CalcContStateDeriv
@@ -1363,7 +1363,7 @@ SUBROUTINE AD_CalcConstrStateResidual( Time, u, p, x, xd, z, OtherState, z_resid
 
          ! Solve for the constraint states here:
 
-      z_residual%DummyConstrState = 0.
+!      z_residual%DummyConstrState = 0.
 
 END SUBROUTINE AD_CalcConstrStateResidual
 

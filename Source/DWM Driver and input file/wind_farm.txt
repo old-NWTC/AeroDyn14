@@ -13,7 +13,7 @@ Implemented in the FAST8 with DWM module
 36    Domain_X                           - Longitudinal domian size  (R) (should be larger than turbine spacing)
 300   Meandering_simulation_time_length  - The total simulation time steps in the meandering wake model for a fixed cross plane (-)
 60    Meandering_Moving_time             - The total simulation time steps in the meandering wake model for a moving cross plane(-)
-5     WFLowerBd                          - The lower bound height of the wind file (m)
+5     WFLowerBd                       - The height of the lower bound of the wind file (m)
 180   Winddir                            - The ambient wind direction (degree)
 "FAST_win32"   DWM.exe name           - The file rootname of the DWM-FAST program
 XCoordinate     YCoordinate

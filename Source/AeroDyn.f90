@@ -464,7 +464,7 @@ SUBROUTINE AD_Init( InitInp, u, p, x, xd, z, O, y, Interval, InitOut, ErrStat, E
       IF (.NOT. ALLOCATED(o%DWM_otherstates%Nforce  )) ALLOCATE ( o%DWM_otherstates%Nforce(  p%Element%NElm,p%NumBl),STAT=ErrStatLcl);CALL SetErrStat(ErrStatLcl, 'Error allocating DWM Nforce array', ErrStat,ErrMess,RoutineName )
       IF (.NOT. ALLOCATED(o%DWM_otherstates%blade_dr)) ALLOCATE ( o%DWM_otherstates%blade_dr(p%Element%NElm),        STAT=ErrStatLcl);CALL SetErrStat(ErrStatLcl, 'Error allocating DWM blade_dr array', ErrStat,ErrMess,RoutineName )
       IF (.NOT. ALLOCATED(p%DWM_Params%ElementRad   )) ALLOCATE ( p%DWM_Params%ElementRad(   p%Element%NElm),        STAT=ErrStatLcl);CALL SetErrStat(ErrStatLcl, 'Error allocating DWM ElementRad array', ErrStat,ErrMess,RoutineName )
-
+     
       o%DWM_otherstates%blade_dr(:) = p%Blade%DR(:)
       p%DWM_Params%ElementRad(:)    = p%Element%RELM(:)   
    
@@ -1174,6 +1174,10 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
                END IF
             
          ENDIF
+         
+         IF (p%UseDWM) THEN
+             o%DWM_otherstates%Nforce(IElement,IBlade) = DFN              ! 12.4.2014 add by yh
+         END IF ! UseDWM
 
          o%StoredForces(1,IElement,IBlade)  = ( DFN*CPitch + DFT*SPitch ) / p%Blade%DR(IElement)
          o%StoredForces(2,IElement,IBlade)  = ( DFN*SPitch - DFT*CPitch ) / p%Blade%DR(IElement)
@@ -1226,7 +1230,7 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
    
       IF (Time > 50.00 ) THEN !BJJ: why is 50 hard-coded here and above???
             
-         o%DWM_otherstates%Nforce(:,:)    = o%StoredForces(1,:,:) 
+         !o%DWM_otherstates%Nforce(:,:)    = o%DWM_otherstates%DFN_DWM(:,:) 
          CALL   DWM_phase3( Time, O%DWM_Inputs, p%DWM_Params, x%DWM_contstates, xd%DWM_discstates, z%DWM_constrstates, &
                                 o%DWM_otherstates, y%DWM_outputs, ErrStatLcl, ErrMessLcl )
     

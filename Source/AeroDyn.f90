@@ -100,7 +100,7 @@ SUBROUTINE AD_Init( InitInp, u, p, x, xd, z, O, y, Interval, InitOut, ErrStat, E
    INTEGER                                   :: Node                          ! Index used to pull points out of the array of values at given node location.
    INTEGER                                   :: ErrStatLcL        ! Error status returned by called routines.
 
-   CHARACTER(LEN(ErrMess))                   :: ErrMessLcl          ! Error message returned by called routines.
+   CHARACTER(ErrMsgLen)                      :: ErrMessLcl          ! Error message returned by called routines.
    CHARACTER(*), PARAMETER                   :: RoutineName = 'AD_Init'
 
          ! Initialize ErrStat
@@ -391,6 +391,9 @@ SUBROUTINE AD_Init( InitInp, u, p, x, xd, z, O, y, Interval, InitOut, ErrStat, E
 
       END DO ! Node
 
+   ELSE
+      u%Twr_InputMarkers%Nnodes = 0
+      y%Twr_OutputLoads%Nnodes  = 0
    END IF ! ( p%TwrProps%CalcTwrAero )
 
 
@@ -726,7 +729,7 @@ SUBROUTINE AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, ErrStat, E
       TYPE(AD_ConstraintStateType)                 :: z_Residual  ! Residual of the constraint state equations (Z)
 
 !      INTEGER(IntKi)                                    :: ErrStat2    ! Error status of the operation (occurs after initial error)
-!      CHARACTER(LEN(ErrMess))                            :: ErrMess2     ! Error message if ErrStat2 /= ErrID_None
+!      CHARACTER(ErrMsgLen)                              :: ErrMess2     ! Error message if ErrStat2 /= ErrID_None
 
          ! Initialize ErrStat
 
@@ -791,7 +794,7 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
    INTEGER                    :: Node              ! Node index.
 
    INTEGER                    :: I
-   CHARACTER(LEN(ErrMess))    :: ErrMessLcl          ! Error message returned by called routines.
+   CHARACTER(ErrMsgLen)       :: ErrMessLcl          ! Error message returned by called routines.
 
 
 

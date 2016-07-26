@@ -18,15 +18,15 @@ PRAND                         HLModel      - Hub-loss model (EQUIL only) [PRANDt
 1                             NumFoil      - Number of airfoil files (-)                                                          
 "S809_Cln.dat"                FoilNm       - Names of the airfoil files [NumFoil lines] (quoted strings)                          
 10                            BldNodes     - Number of blade nodes used for analysis (-)
-  RELM       Twist      DR      Chord  NFoil   ElPrList  {   Twist ignored by ADAMS (but placeholders must be present) } 
- 0.7400     0.0000    1.4800   1.5000   1 
- 2.2200     0.0000    1.4800   1.5000   1       PRINT
- 3.7000     0.0000    1.4800   1.5000   1       
- 5.1800     0.0000    1.4800   1.5000   1       PRINT
- 6.6600     0.0000    1.4800   1.5000   1       
- 8.1400     0.0000    1.4800   1.5000   1       PRINT
- 9.6200     0.0000    1.4800   1.5000   1       
-11.1000     0.0000    1.4800   1.5000   1       PRINT
-12.5800     0.0000    1.4800   1.5000   1       
-14.0600     0.0000    1.4800   1.5000   1       PRINT
+  RELM       Twist      DR      Chord  Area  NFoil  ElPrList  {   Twist ignored by ADAMS (but placeholders must be present) } 
+ 0.7400     0.0000    1.4800   1.5000  0.6    1    
+ 2.2200     0.0000    1.4800   1.5000  0.52   1       PRINT
+ 3.7000     0.0000    1.4800   1.5000  0.48   1    
+ 5.1800     0.0000    1.4800   1.5000  0.44   1       PRINT
+ 6.6600     0.0000    1.4800   1.5000  0.40   1     
+ 8.1400     0.0000    1.4800   1.5000  0.35   1       PRINT
+ 9.6200     0.0000    1.4800   1.5000  0.3    1    
+11.1000     0.0000    1.4800   1.5000  0.22   1       PRINT
+12.5800     0.0000    1.4800   1.5000  0.2    1    
+14.0600     0.0000    1.4800   1.5000  0.1    1       PRINT
 

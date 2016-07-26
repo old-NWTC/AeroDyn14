@@ -17,9 +17,9 @@
 ! limitations under the License.
 !
 !**********************************************************************************************************************************
-! File last committed: $Date$
-! (File) Revision #: $Rev$
-! URL: $HeadURL$
+! File last committed: $Date: 2014-07-11 10:08:04 -0600 (Fri, 11 Jul 2014) $
+! (File) Revision #: $Rev: 117 $
+! URL: $HeadURL: https://windsvn.nrel.gov/AeroDyn/branches/HydroAero/Source/AeroDyn.f90 $
 !**********************************************************************************************************************************
 MODULE AeroDyn
 
@@ -753,7 +753,8 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
    REAL(ReKi)                 :: PMA
    REAL(ReKi)                 :: SPitch                     ! sine of PitNow
    REAL(ReKi)                 :: CPitch                     ! cosine of PitNow
-
+   REAL(ReKi)                 :: GRho ! Fluid density times gravity. !!!LKILCHER_BUOY_HACK
+   
    REAL(ReKi)                 :: AvgVelNacelleRotorFurlYaw
    REAL(ReKi)                 :: AvgVelTowerBaseNacelleYaw
    REAL(ReKi)                 :: AvgVelTowerBaseYaw
@@ -773,6 +774,8 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
 
    CHARACTER(LEN(ErrMess))                   :: ErrMessLcl          ! Error message returned by called routines.
 
+   !!!LKILCHER_BUOY_HACK:
+   Grho = p%Wind%RHO * 9.81 ! Is there a 'g=9.81' parameters somwhere? 
 
 
    ! Initialize ErrStat
@@ -1005,6 +1008,15 @@ SUBROUTINE AD_CalcOutput( Time, u, p, x, xd, z, O, y, ErrStat, ErrMess )
          o%StoredForces(1,IElement,IBlade)  = ( DFN*CPitch + DFT*SPitch ) / p%Blade%DR(IElement)
          o%StoredForces(2,IElement,IBlade)  = ( DFN*SPitch - DFT*CPitch ) / p%Blade%DR(IElement)
          o%StoredForces(3,IElement,IBlade)  = 0.0
+         
+         !!!LKILCHER_BUOY_HACK:
+         !!! Here I am adding the Buoyancy forces to the 'Stored Forces' on each blade element.
+         !!! These forces are equal to the volume displaced, times the fluid density, times gravity, dotted with the vertical unit-vector.
+         !!! Here we use blade area because FAST uses per-length forces: area=vol/length
+         o%StoredForces(1,IElement,Iblade)  = o%StoredForces(1,IElement,Iblade) + u%InputMarkers(IBlade)%Orientation(1,3,IElement) * GRho * p%Element%Area(IElement) ! x-component is flapwise
+         o%StoredForces(2,IElement,Iblade)  = o%StoredForces(2,IElement,Iblade) + u%InputMarkers(IBlade)%Orientation(2,3,IElement) * GRho * p%Element%Area(IElement) ! y-component is edgewise
+         !!! For now I'll ignore the dA/dr (z-radial) component
+         !!!END LKILCHER_BUOY_HACK
 
          o%StoredMoments(1,IElement,IBlade)  = 0.0
          o%StoredMoments(2,IElement,IBlade)  = 0.0

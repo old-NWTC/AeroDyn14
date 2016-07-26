@@ -1,0 +1,4 @@
+Modified Input file to include a 'cross-sectional area' column to the blade element definition.
+Modified AeroSubs.f90:AD_GetInput to read the area values.
+Modified AD_RegistryEntries.xlsx (and Registry-AD.txt) to include an 'AREA' variable in the blade-element type.
+Added AREA memory allocation to GenSubs.f90.

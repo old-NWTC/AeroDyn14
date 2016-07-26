@@ -1,7 +1,7 @@
 !**********************************************************************************************************************************
-! File last committed: $Date$
-! (File) Revision #: $Rev$
-! URL: $HeadURL$
+! File last committed: $Date: 2014-07-07 12:06:35 -0600 (Mon, 07 Jul 2014) $
+! (File) Revision #: $Rev: 114 $
+! URL: $HeadURL: https://windsvn.nrel.gov/AeroDyn/branches/HydroAero/Source/AeroSubs.f90 $
 !**********************************************************************************************************************************
 MODULE AeroSubs
 
@@ -524,7 +524,7 @@ SUBROUTINE AD_GetInput(InitInp, P, x, xd, z, O, y, ErrStat, ErrMess )
       READ(UnIn,'(A)',IOSTAT=ErrStat) Line      !read into a line to see if print/no print is enabled
 
       IF (ErrStat == 0) THEN
-         READ(Line,*,IOSTAT=ErrStat) P%Element%RElm(IElm), P%Element%Twist(IElm), P%Blade%DR(IElm), P%Blade%C(IElm), P%AirFoil%NFoil(IElm)
+         READ(Line,*,IOSTAT=ErrStat) P%Element%RElm(IElm), P%Element%Twist(IElm), P%Blade%DR(IElm), P%Blade%C(IElm), P%Element%Area(IElm), P%AirFoil%NFoil(IElm) !!!LKILCHER_BUOY: added 'Area'
       END IF
 
       IF ( ErrStat == 0 ) THEN
@@ -559,8 +559,8 @@ SUBROUTINE AD_GetInput(InitInp, P, x, xd, z, O, y, ErrStat, ErrMess )
          !'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
          IF ( p%Echo ) THEN     ! NWTC_Library echo file
-            WRITE (p%UnEc,'(4(2X,ES11.4e2),2X,I11,1(2X,L11))')  P%Element%RElm(IElm), P%Element%Twist(IElm), P%Blade%DR(IElm), P%Blade%C(IElm), P%AirFoil%NFoil(IElm), &
-                   O%ElOut%ElPrList(IElm) /= 0  !, O%ElOut%WndElPrList(IElm) == 0
+            WRITE (p%UnEc,'(4(2X,ES11.4e2),2X,I11,1(2X,L11))')  P%Element%RElm(IElm), P%Element%Twist(IElm), P%Blade%DR(IElm), P%Blade%C(IElm), P%Element%Area(IElm), P%AirFoil%NFoil(IElm), &
+                   O%ElOut%ElPrList(IElm) /= 0  !, O%ElOut%WndElPrList(IElm) == 0 !!!LKILCHER_BUOY: added 'Area'
          END IF
 
       ELSE IF ( ErrStat < 0 ) THEN
@@ -930,6 +930,7 @@ WRITE(UnOut,Ec_IntFrmt) p%Element%NELM,'BldNodes','Number of blade elements per 
                      '   Twist  ', &
                      '    DR    ', &
                      '   Chord  ', &
+                     '   Area   ', & !!!LKILCHER_BUOY
                      '   NFoil  ', &
                      '  Print?  ', &
                      ' Tip-loss ', &
@@ -942,6 +943,7 @@ WRITE(UnOut,Ec_IntFrmt) p%Element%NELM,'BldNodes','Number of blade elements per 
                      '   (deg)  ', &
                      '    (m)   ', &
                      '    (m)   ', &
+                     '   (m2)   ', & !!!LKILCHER_BUOY
                      '    (-)   ', &
                      ' (Yes/No) ', &
                      ' constant ', &
@@ -952,13 +954,14 @@ WRITE(UnOut,Ec_IntFrmt) p%Element%NELM,'BldNodes','Number of blade elements per 
                      '----------', &
                      '----------', &
                      '----------', &
+                     '----------', & !!!LKILCHER_BUOY
                      '----------', &
                      '----------', &
                      '----------', &
                      '----------'
 
       ! column data
-   Frmt = '(3X, I10, 4("'//Delim//'",F10.5),"'//Delim//'",I10,"'//Delim//'",A10, 2("'//Delim//'",F10.5) )'
+   Frmt = '(3X, I10, 5("'//Delim//'",F10.5),"'//Delim//'",I10,"'//Delim//'",A10, 2("'//Delim//'",F10.5) )'
 
    DO IElm = 1, p%Element%NELM
 
@@ -969,7 +972,8 @@ WRITE(UnOut,Ec_IntFrmt) p%Element%NELM,'BldNodes','Number of blade elements per 
       ENDIF
 
       WRITE(UnOut, Frmt) IElm, p%Element%RELM(IElm), p%Element%TWIST(IElm)*R2D, p%Blade%DR(IElm),  p%Blade%C(IElm), &
-                         p%AirFoil%NFOIL(IElm), TRIM(Mesage), p%Element%TLCNST(IElm), p%Element%HLCNST(IElm)
+                         p%Element%Area(IElm), p%AirFoil%NFOIL(IElm), TRIM(Mesage), p%Element%TLCNST(IElm), &
+                         p%Element%HLCNST(IElm) !!!LKILCHER_BUOY: added 'Area'
    END DO
 
 

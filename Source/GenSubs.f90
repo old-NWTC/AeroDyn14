@@ -1,7 +1,7 @@
 !**********************************************************************************************************************************
-! File last committed: $Date$
-! (File) Revision #: $Rev$
-! URL: $HeadURL$
+! File last committed: $Date: 2014-07-08 12:53:10 -0600 (Tue, 08 Jul 2014) $
+! (File) Revision #: $Rev: 116 $
+! URL: $HeadURL: https://windsvn.nrel.gov/AeroDyn/branches/HydroAero/Source/GenSubs.f90 $
 !**********************************************************************************************************************************
  MODULE AeroGenSubs
 
@@ -263,6 +263,10 @@ IF (Arg(1:7) == 'Element') THEN
 
    IF (.NOT. ALLOCATED(P%Element%TWIST)) ALLOCATE ( P%Element%TWIST(NELM) , STAT=Sttus )
    IF ( Sttus /= 0 ) CALL ProgAbort ( ' Error allocating memory for TWIST array.' )
+
+   !!!LKILCHER_BUOY_HACK:
+   IF (.NOT. ALLOCATED(P%Element%AREA)) ALLOCATE ( P%Element%AREA(NELM) , STAT=Sttus )
+   IF ( Sttus /= 0 ) CALL ProgAbort ( ' Error allocating memory for AREA array.' )
 
    IF (.NOT. ALLOCATED(P%Element%TLCNST)) ALLOCATE ( P%Element%TLCNST(NELM) , STAT=Sttus )
    IF ( Sttus /= 0 ) CALL ProgAbort ( ' Error allocating memory for TLCNST array.' )

@@ -779,6 +779,9 @@ v13.00.01c-bjj, 7-Dec-2012 B. Jonkman
 v13.00.02a-bjj, 20-Feb-2013, B. Jonkman
   Cleaned up for release; added user's guide addendum to the archive.
 
+v13.00.02b-lfk, 07-July-2014, L. Kilcher
+  Added buoyancy term to edgewise and flapwise loads. See the LFK_Changes.txt file for further details.
+
 -------------------------------------------------------------------------------
 To do:
 

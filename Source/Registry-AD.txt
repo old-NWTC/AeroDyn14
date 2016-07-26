@@ -4,9 +4,9 @@
 # It also contains copy, destroy, pack, and unpack routines associated with each defined data types.
 # See the NWTC Programmer's Handbook for further information on the format/contents of this file.
 ###################################################################################################################################
-# File last committed: $Date$
-# (File) Revision #: $Rev$
-# URL: $HeadURL$
+# File last committed: $Date: 2014-07-08 12:53:10 -0600 (Tue, 08 Jul 2014) $
+# (File) Revision #: $Rev: 116 $
+# URL: $HeadURL: https://windsvn.nrel.gov/AeroDyn/branches/HydroAero/Source/Registry-AD.txt $
 ###################################################################################################################################
 #
 # Entries are of the form
@@ -184,6 +184,7 @@ typedef	^	Element	ReKi	OLD_AP_NS	{:}{:}	-	-		-	#allocated in VIND
 typedef	^	Element	ReKi	PITNOW	-	-	-		-
 typedef	^	ElementParms	IntKi	NELM	-	-	-		-
 typedef	^	ElementParms	ReKi	TWIST	{:}	-	-		-
+typedef	^	ElementParms	ReKi	AREA	{:}	-	-	"Cross-sectional area of elem"
 typedef	^	ElementParms	ReKi	RELM	{:}	-	-		-
 typedef	^	ElementParms	ReKi	HLCNST	{:}	-	-		-
 typedef	^	ElementParms	ReKi	TLCNST	{:}	-	-		-
